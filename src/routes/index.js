@@ -4,6 +4,8 @@ const metaRoutes = require("./meta.routes");
 const seedPreviewRoutes = require("./seed-preview.routes");
 const authRoutes = require("../features/auth/auth.routes");
 const userRoutes = require("../features/user/user.routes");
+const exploreRoutes = require("../features/explore/explore.routes");
+const searchRoutes = require("../features/search/search.routes");
 
 const router = express.Router();
 
@@ -19,5 +21,7 @@ router.use("/api/v1/meta", metaRoutes);
 router.use("/api/v1/seed-preview", seedPreviewRoutes);
 router.use("/api/v1/auth", authRoutes);
 router.use("/api/v1/me", userRoutes);
+router.use("/api/v1", exploreRoutes);
+router.use("/api/v1", searchRoutes);
 
 module.exports = router;

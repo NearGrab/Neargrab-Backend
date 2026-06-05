@@ -57,15 +57,15 @@ This checklist is divided into phases so one developer can build the complete ba
 
 ## Phase 4: Public Discovery APIs
 
-- [ ] Implement category and brand list.
-- [ ] Implement explore feed.
-- [ ] Implement product search with query, filters, sort, pagination.
-- [ ] Implement search suggestions.
-- [ ] Implement search event tracking.
-- [ ] Implement product request creation.
-- [ ] Add response mappers matching current frontend product card fields.
-- [ ] Add tests for search filters and sort modes.
-- [ ] Docs/api/.
+- [x] Implement category and brand list.
+- [x] Implement explore feed.
+- [x] Implement product search with query, filters, sort, pagination.
+- [x] Implement search suggestions.
+- [x] Implement search event tracking.
+- [x] Implement product request creation.
+- [x] Add response mappers matching current frontend product card fields.
+- [x] Add tests for search filters and sort modes.
+- [x] Docs/api/.
 
 ## Phase 5: Product And Shop Public APIs
 
