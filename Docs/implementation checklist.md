@@ -32,16 +32,16 @@ This checklist is divided into phases so one developer can build the complete ba
 
 ## Phase 2: Middleware And Infrastructure
 
-- [ ] Add request id middleware.
-- [ ] Add JSON parser, CORS, Helmet, rate limiters.
-- [ ] Add pino request logging.
-- [ ] Add auth and optional auth middleware.
-- [ ] Add role/permission middleware.
-- [ ] Add Zod validation middleware.
-- [ ] Add upload middleware for local media.
-- [ ] Add 404 and error middleware.
-- [ ] Add pagination utility.
-- [ ] Add Prisma transaction helper if needed.
+- [x] Add request id middleware.
+- [x] Add JSON parser, CORS, Helmet, rate limiters.
+- [x] Add pino request logging.
+- [x] Add auth and optional auth middleware.
+- [x] Add role/permission middleware.
+- [x] Add Zod validation middleware.
+- [x] Add upload middleware for local media.
+- [x] Add 404 and error middleware.
+- [x] Add pagination utility.
+- [x] Add Prisma transaction helper if needed.
 
 ## Phase 3: Authentication And User APIs
 

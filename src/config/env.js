@@ -20,6 +20,14 @@ const envSchema = z
     CLOUDINARY_URLS: z.string().default(""),
     UPLOAD_DRIVER: z.string().default("local"),
     UPLOAD_DIR: z.string().default("uploads"),
+    UPLOAD_MAX_FILE_SIZE_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(5242880), // 5MB
+    RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60000), // 1 minute
+    RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+    LOG_LEVEL: z.string().default("info"),
     PUBLIC_BASE_URL: z.string().url().default("http://localhost:5000"),
     GOOGLE_CLIENT_ID: z.string().default(""),
     SMS_PROVIDER: z.string().default("mock"),

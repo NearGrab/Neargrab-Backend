@@ -1,89 +1,41 @@
 const express = require("express");
-const cors = require("cors");
-const helmet = require("helmet");
-const pinoHttp = require("pino-http");
-const env = require("./config/env");
-const logger = require("./config/logger");
+const requestIdMiddleware = require("./middleware/request-id.middleware");
+const loggerMiddleware = require("./middleware/logger.middleware");
+const {
+  helmetMiddleware,
+  corsMiddleware,
+  jsonMiddleware,
+  urlEncodedMiddleware,
+  generalLimiter,
+} = require("./middleware/security.middleware");
 const routes = require("./routes");
-const { AppError, ERROR_CODES } = require("./lib/errors");
-const { sendError } = require("./lib/response");
+const notFoundMiddleware = require("./middleware/not-found.middleware");
+const errorMiddleware = require("./middleware/error.middleware");
 
 const app = express();
 
-app.use(helmet());
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || env.CORS_ORIGINS.includes(origin)) {
-        callback(null, true);
-        return;
-      }
+// Request ID attachment
+app.use(requestIdMiddleware);
 
-      callback(
-        new AppError({
-          statusCode: 403,
-          code: ERROR_CODES.FORBIDDEN,
-          message: "Origin is not allowed by CORS",
-        }),
-      );
-    },
-    credentials: true,
-  }),
-);
-app.use(express.json({ limit: "1mb" }));
-app.use(
-  pinoHttp({
-    logger,
-    quietReqLogger: env.NODE_ENV === "test",
-    autoLogging: false,
-  }),
-);
-app.use((req, res, next) => {
-  const startedAt = process.hrtime.bigint();
+// Structured logger
+app.use(loggerMiddleware);
 
-  res.on("finish", () => {
-    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
-    logger.info(
-      `[request] ${req.method} ${req.originalUrl} ${res.statusCode} ${req.ip} ${Math.round(durationMs)}ms`,
-    );
-  });
+// Security and body parsing
+app.use(helmetMiddleware);
+app.use(corsMiddleware);
+app.use(jsonMiddleware);
+app.use(urlEncodedMiddleware);
 
-  next();
-});
+// Rate limiting
+app.use(generalLimiter);
 
+// App routes
 app.use(routes);
 
-app.use((req, _res, next) => {
-  next(
-    new AppError({
-      statusCode: 404,
-      code: ERROR_CODES.NOT_FOUND,
-      message: `Route ${req.method} ${req.originalUrl} not found`,
-    }),
-  );
-});
+// Not Found Handler
+app.use(notFoundMiddleware);
 
-app.use((err, req, res, _next) => {
-  const appError =
-    err instanceof AppError
-      ? err
-      : new AppError({
-          message:
-            env.NODE_ENV === "production"
-              ? "Something went wrong"
-              : err.message || "Something went wrong",
-        });
-
-  if (!(err instanceof AppError)) {
-    req.log?.error({ err }, "Unhandled application error");
-  }
-
-  return sendError(res, {
-    statusCode: appError.statusCode,
-    code: appError.code,
-    message: appError.message,
-    details: appError.details,
-  });
-});
+// Centralized Error Handler
+app.use(errorMiddleware);
 
 module.exports = app;
