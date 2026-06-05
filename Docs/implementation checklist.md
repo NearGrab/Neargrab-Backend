@@ -45,15 +45,15 @@ This checklist is divided into phases so one developer can build the complete ba
 
 ## Phase 3: Authentication And User APIs
 
-- [ ] Implement AuthService, TokenService, OtpService.
-- [ ] Implement signup/login/refresh/logout.
-- [ ] Implement Google auth placeholder or real verification.
-- [ ] Implement OTP request/verify with mock provider.
-- [ ] Implement forgot/reset password.
-- [ ] Implement `/me`, profile, settings, account deactivate.
-- [ ] Add unit tests for token rotation and password auth.
-- [ ] Add integration tests for signup/login/refresh/logout.
-- [ ] Create Docs/api/auth.md for docs on auth.
+- [x] Implement AuthService, TokenService, OtpService.
+- [x] Implement signup/login/refresh/logout.
+- [x] Implement Google auth placeholder or real verification.
+- [x] Implement OTP request/verify with mock provider.
+- [x] Implement forgot/reset password.
+- [x] Implement `/me`, profile, settings, account deactivate.
+- [x] Add unit tests for token rotation and password auth.
+- [x] Add integration tests for signup/login/refresh/logout.
+- [x] Create Docs/api/auth.md for docs on auth.
 
 ## Phase 4: Public Discovery APIs
 
