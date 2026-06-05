@@ -4,31 +4,31 @@ This checklist is divided into phases so one developer can build the complete ba
 
 ## Phase 0: Project Setup
 
-- [ ] Install backend dependencies: Express, Prisma, @prisma/client, zod, jsonwebtoken, bcrypt/argon2, cors, helmet, pino, multer, dotenv.
-- [ ] Add dev dependencies: nodemon, prisma, jest/vitest, supertest, eslint/prettier if desired.
-- [ ] Create `src/app.js` and `src/server.js`.
-- [ ] Create config modules for env, Prisma client, logger.
-- [ ] Add `.env.example`.
-- [ ] Add scripts: `dev`, `start`, `test`, `prisma:generate`, `prisma:migrate`, `prisma:seed`.
-- [ ] Add basic `/health` route.
-- [ ] Add centralized response helper and error class.
+- [x] Install backend dependencies: Express, Prisma, @prisma/client, zod, jsonwebtoken, bcrypt/argon2, cors, helmet, pino, multer, dotenv.
+- [x] Add dev dependencies: nodemon, prisma, jest/vitest, supertest, eslint/prettier if desired.
+- [x] Create `src/app.js` and `src/server.js`.
+- [x] Create config modules for env, Prisma client, logger.
+- [x] Add `.env.example`.
+- [x] Add scripts: `dev`, `start`, `test`, `prisma:generate`, `prisma:migrate`, `prisma:seed`.
+- [x] Add basic `/health` route.
+- [x] Add centralized response helper and error class.
 
 ## Phase 1: Prisma Schema And Seed
 
-- [ ] Create `prisma/schema.prisma`.
-- [ ] Add enums from `db.md`.
-- [ ] Add user/auth/session/OTP models.
-- [ ] Add shop/address/contact/timing/photo/payment/tag/language models.
-- [ ] Add category/brand/product/image/attribute models.
-- [ ] Add saved product/cart/reservation models.
-- [ ] Add review/feedback models.
-- [ ] Add notification/preference models.
-- [ ] Add banner/pin/content/audit models.
-- [ ] Add analytics models: search event, product view, shop lead, banner impression.
-- [ ] Add media asset model.
-- [ ] Run initial migration.
-- [ ] Write seed script with demo cities, categories, users, shops, products, banners.
-- [ ] Verify Prisma Studio can browse seeded data.
+- [x] Create `prisma/schema.prisma`.
+- [x] Add enums from `db.md`.
+- [x] Add user/auth/session/OTP models.
+- [x] Add shop/address/contact/timing/photo/payment/tag/language models.
+- [x] Add category/brand/product/image/attribute models.
+- [x] Add saved product/cart/reservation models.
+- [x] Add review/feedback models.
+- [x] Add notification/preference models.
+- [x] Add banner/pin/content/audit models.
+- [x] Add analytics models: search event, product view, shop lead, banner impression.
+- [x] Add media asset model.
+- [x] Run initial migration.
+- [x] Write seed script with demo cities, categories, users, shops, products, banners.
+- [x] Verify Prisma Studio can browse seeded data.
 
 ## Phase 2: Middleware And Infrastructure
 
