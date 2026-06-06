@@ -11,6 +11,7 @@ const shopRoutes = require("../features/shop/shop.routes");
 const cartRoutes = require("../features/cart/cart.routes");
 const reservationRoutes = require("../features/reservation/reservation.routes");
 const notificationRoutes = require("../features/notification/notification.routes");
+const onboardingRoutes = require("../features/shopkeeper-onboarding/onboarding.routes");
 
 const router = express.Router();
 
@@ -33,5 +34,6 @@ router.use("/api/v1/shops", shopRoutes);
 router.use("/api/v1/cart", cartRoutes);
 router.use("/api/v1/reservations", reservationRoutes);
 router.use("/api/v1/notifications", notificationRoutes);
+router.use("/api/v1/shopkeeper/onboarding", onboardingRoutes);
 
 module.exports = router;
