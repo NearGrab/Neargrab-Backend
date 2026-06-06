@@ -95,32 +95,32 @@ This checklist is divided into phases so one developer can build the complete ba
 
 ## Phase 7: Shopkeeper Onboarding
 
-- [ ] Implement draft shop creation for a normal user.
-- [ ] Implement details step.
-- [ ] Implement address step with coordinates and radius.
-- [ ] Implement contact/timings/preferences step.
-- [ ] Implement business info/documents/languages/tags/payment step.
-- [ ] Implement photos step.
-- [ ] Implement submit flow with required-field validation.
-- [ ] Upgrade role/status rules carefully: user can become shopkeeper after draft submit or after admin approval, based on product decision.
-- [ ] Notify admins on new pending shop.
-- [ ] Add integration test for complete onboarding.
+- [x] Implement draft shop creation for a normal user.
+- [x] Implement details step.
+- [x] Implement address step with coordinates and radius.
+- [x] Implement contact/timings/preferences step.
+- [x] Implement business info/documents/languages/tags/payment step.
+- [x] Implement photos step.
+- [x] Implement submit flow with required-field validation.
+- [x] Upgrade role/status rules carefully: user can become shopkeeper after draft submit or after admin approval, based on product decision.
+- [x] Notify admins on new pending shop.
+- [x] Add integration test for complete onboarding.
 
 ## Phase 8: Shopkeeper Dashboard And Catalog
 
-- [ ] Implement dashboard stats.
-- [ ] Implement low stock alerts.
-- [ ] Implement top-performing products.
-- [ ] Implement recent reviews.
-- [ ] Implement QR/profile URL payload.
-- [ ] Implement own product list with search/filter/sort/pagination.
-- [ ] Implement product create/update/delete.
-- [ ] Implement product image add/remove.
-- [ ] Implement stock toggle/count/status.
-- [ ] Implement bulk product updates.
-- [ ] Implement shopkeeper profile edit and timings replacement.
-- [ ] Implement review reply.
-- [ ] Add ownership tests to ensure shopkeepers cannot edit other shops.
+- [x] Implement dashboard stats.
+- [x] Implement low stock alerts.
+- [x] Implement top-performing products.
+- [x] Implement recent reviews.
+- [x] Implement QR/profile URL payload.
+- [x] Implement own product list with search/filter/sort/pagination.
+- [x] Implement product create/update/delete.
+- [x] Implement product image add/remove.
+- [x] Implement stock toggle/count/status.
+- [x] Implement bulk product updates.
+- [x] Implement shopkeeper profile edit and timings replacement.
+- [x] Implement review reply (skipped/disabled per merchant request).
+- [x] Add ownership tests to ensure shopkeepers cannot edit other shops.
 
 ## Phase 9: Admin Panel APIs
 
