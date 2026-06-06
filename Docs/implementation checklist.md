@@ -69,17 +69,17 @@ This checklist is divided into phases so one developer can build the complete ba
 
 ## Phase 5: Product And Shop Public APIs
 
-- [ ] Implement product detail endpoint.
-- [ ] Implement available stores endpoint.
-- [ ] Implement similar products endpoint.
-- [ ] Implement product reviews list/create.
-- [ ] Implement product save/unsave.
-- [ ] Implement product view tracking.
-- [ ] Implement product feedback/report.
-- [ ] Implement public shop profile.
-- [ ] Implement shop products, shop reviews, shop updates.
-- [ ] Implement shop lead tracking for map/address/call/WhatsApp.
-- [ ] Add integration tests for product detail and shop profile.
+- [x] Implement product detail endpoint.
+- [x] Implement available stores endpoint.
+- [x] Implement similar products endpoint.
+- [x] Implement product reviews list/create.
+- [x] Implement product save/unsave.
+- [x] Implement product view tracking.
+- [x] Implement product feedback/report.
+- [x] Implement public shop profile.
+- [x] Implement shop products, shop reviews, shop updates.
+- [x] Implement shop lead tracking for map/address/call/WhatsApp.
+- [x] Add integration tests for product detail and shop profile.
 
 ## Phase 6: Cart, Reservations, Notifications
 
