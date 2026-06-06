@@ -204,6 +204,19 @@ async function updateSettings(userId, { privacyJson, preferencesJson, notificati
 async function deactivateMe(userId) {
   const prisma = getPrisma();
 
+  try {
+    const notificationService = require("../notification/notification.service");
+    await notificationService.createNotification({
+      userId,
+      type: "SECURITY",
+      title: "Security update",
+      message: "Your account has been deactivated successfully.",
+      actionUrl: "/settings",
+    });
+  } catch (err) {
+    console.error("Failed to create deactivation security notification:", err);
+  }
+
   await prisma.user.update({
     where: { id: userId },
     data: {

@@ -83,15 +83,15 @@ This checklist is divided into phases so one developer can build the complete ba
 
 ## Phase 6: Cart, Reservations, Notifications
 
-- [ ] Implement server cart get/add/update/remove/clear.
-- [ ] Snapshot product price/name/shop/image when adding cart item.
-- [ ] Implement reservation create from cart/direct product.
-- [ ] Implement user reservation list/detail/cancel.
-- [ ] Implement reservation expiration job.
-- [ ] Implement notification list/read/delete.
-- [ ] Implement notification preferences.
-- [ ] Trigger notifications for reservation status changes and security events.
-- [ ] Add tests for cart totals and reservation state transitions.
+- [x] Implement server cart get/add/update/remove/clear.
+- [x] Snapshot product price/name/shop/image when adding cart item.
+- [x] Implement reservation create from cart/direct product.
+- [x] Implement user reservation list/detail/cancel.
+- [x] Implement reservation expiration job.
+- [x] Implement notification list/read/delete.
+- [x] Implement notification preferences.
+- [x] Trigger notifications for reservation status changes and security events.
+- [x] Add tests for cart totals and reservation state transitions.
 
 ## Phase 7: Shopkeeper Onboarding
 

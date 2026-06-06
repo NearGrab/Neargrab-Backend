@@ -8,6 +8,9 @@ const exploreRoutes = require("../features/explore/explore.routes");
 const searchRoutes = require("../features/search/search.routes");
 const productRoutes = require("../features/product/product.routes");
 const shopRoutes = require("../features/shop/shop.routes");
+const cartRoutes = require("../features/cart/cart.routes");
+const reservationRoutes = require("../features/reservation/reservation.routes");
+const notificationRoutes = require("../features/notification/notification.routes");
 
 const router = express.Router();
 
@@ -27,5 +30,8 @@ router.use("/api/v1", exploreRoutes);
 router.use("/api/v1", searchRoutes);
 router.use("/api/v1/products", productRoutes);
 router.use("/api/v1/shops", shopRoutes);
+router.use("/api/v1/cart", cartRoutes);
+router.use("/api/v1/reservations", reservationRoutes);
+router.use("/api/v1/notifications", notificationRoutes);
 
 module.exports = router;

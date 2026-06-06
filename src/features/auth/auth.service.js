@@ -126,6 +126,19 @@ async function signup({ name, email, phone, password, city, userAgent = null, ip
   const { session, rawRefreshToken } = await tokenService.createSession(user.id, userAgent, ipAddress);
   const accessToken = tokenService.generateAccessToken(user, session);
 
+  try {
+    const notificationService = require("../notification/notification.service");
+    await notificationService.createNotification({
+      userId: user.id,
+      type: "SECURITY",
+      title: "Security update",
+      message: "Successful signup. Welcome to Neargrab!",
+      actionUrl: "/settings",
+    });
+  } catch (err) {
+    console.error("Failed to create signup security notification:", err);
+  }
+
   // Hide passwordHash in returned object
   const { passwordHash: _, ...safeUser } = user;
 
@@ -462,6 +475,19 @@ async function resetPassword(email, code, newPassword) {
     data: { passwordHash },
   });
 
+  try {
+    const notificationService = require("../notification/notification.service");
+    await notificationService.createNotification({
+      userId: user.id,
+      type: "SECURITY",
+      title: "Security update",
+      message: "Your password was reset successfully.",
+      actionUrl: "/settings",
+    });
+  } catch (err) {
+    console.error("Failed to create password reset security notification:", err);
+  }
+
   // Revoke all existing sessions (forces re-login)
   await tokenService.revokeAllUserSessions(user.id);
 
@@ -480,6 +506,18 @@ async function logout(sessionId) {
  * Logout all sessions.
  */
 async function logoutAll(userId) {
+  try {
+    const notificationService = require("../notification/notification.service");
+    await notificationService.createNotification({
+      userId,
+      type: "SECURITY",
+      title: "Security update",
+      message: "Your account was logged out from all active sessions.",
+      actionUrl: "/settings",
+    });
+  } catch (err) {
+    console.error("Failed to create logout all security notification:", err);
+  }
   await tokenService.revokeAllUserSessions(userId);
   return { success: true };
 }
