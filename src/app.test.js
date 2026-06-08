@@ -143,3 +143,21 @@ describe("GET /api/v1/seed-preview", () => {
     expect(response.body.data.sampleBanners).toHaveLength(1);
   });
 });
+
+describe("GET /docs", () => {
+  it("redirects to /docs/", async () => {
+    await request(app)
+      .get("/docs")
+      .expect(301)
+      .expect("Location", "/docs/");
+  });
+
+  it("serves the Swagger UI HTML at /docs/", async () => {
+    const response = await request(app)
+      .get("/docs/")
+      .expect(200);
+    
+    expect(response.text).toContain("swagger-ui");
+  });
+});
+

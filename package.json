@@ -29,6 +29,8 @@
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",
     "prisma": "^6.8.2",
+    "swagger-ui-express": "^5.0.1",
+    "yaml": "^2.9.0",
     "zod": "^3.25.28"
   },
   "devDependencies": {

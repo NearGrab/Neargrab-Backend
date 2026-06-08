@@ -12,6 +12,7 @@ const routes = require("./routes");
 const env = require("./config/env");
 const notFoundMiddleware = require("./middleware/not-found.middleware");
 const errorMiddleware = require("./middleware/error.middleware");
+const swaggerRouter = require("./swagger");
 
 const app = express();
 
@@ -20,6 +21,9 @@ app.use(requestIdMiddleware);
 
 // Structured logger
 app.use(loggerMiddleware);
+
+// API Documentation
+app.use("/docs", swaggerRouter);
 
 // Security and body parsing
 app.use(helmetMiddleware);
