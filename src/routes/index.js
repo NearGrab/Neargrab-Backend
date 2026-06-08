@@ -13,6 +13,8 @@ const reservationRoutes = require("../features/reservation/reservation.routes");
 const notificationRoutes = require("../features/notification/notification.routes");
 const onboardingRoutes = require("../features/shopkeeper-onboarding/onboarding.routes");
 const shopkeeperDashboardRoutes = require("../features/shopkeeper-dashboard/dashboard.routes");
+const adminRoutes = require("../features/admin/admin.routes");
+
 
 const router = express.Router();
 
@@ -37,5 +39,7 @@ router.use("/api/v1/reservations", reservationRoutes);
 router.use("/api/v1/notifications", notificationRoutes);
 router.use("/api/v1/shopkeeper/onboarding", onboardingRoutes);
 router.use("/api/v1/shopkeeper", shopkeeperDashboardRoutes);
+router.use("/api/v1/admin", adminRoutes);
+
 
 module.exports = router;

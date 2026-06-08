@@ -124,20 +124,20 @@ This checklist is divided into phases so one developer can build the complete ba
 
 ## Phase 9: Admin Panel APIs
 
-- [ ] Implement admin login and `/admin/me`.
-- [ ] Implement admin dashboard summary, metrics, top cities, leads by source, recent activity.
-- [ ] Implement users list/detail/status/role updates.
-- [ ] Implement shop list and verification approval/rejection.
-- [ ] Implement admin product list/metrics/update/bulk update.
-- [ ] Implement product pin rules by city.
-- [ ] Implement banner list/create/detail/update/delete.
-- [ ] Implement banner metrics/performance.
-- [ ] Implement banner pin/unpin with pin-limit validation.
-- [ ] Implement content page list/update.
-- [ ] Implement review and feedback moderation.
-- [ ] Implement audit-log list for super admin.
-- [ ] Add audit logs for every admin mutation.
-- [ ] Add contract tests for admin table response shapes.
+- [x] Implement admin login and `/admin/me`.
+- [x] Implement admin dashboard summary, metrics, top cities, leads by source, recent activity.
+- [x] Implement users list/detail/status/role updates.
+- [x] Implement shop list and verification approval/rejection.
+- [x] Implement admin product list/metrics/update/bulk update.
+- [x] Implement product pin rules by city.
+- [x] Implement banner list/create/detail/update/delete.
+- [x] Implement banner metrics/performance.
+- [x] Implement banner pin/unpin with pin-limit validation.
+- [x] Implement content page list/update.
+- [x] Implement review and feedback moderation.
+- [x] Implement audit-log list for super admin.
+- [x] Add audit logs for every admin mutation.
+- [x] Add contract tests for admin table response shapes.
 
 ## Phase 10: Media And Upload Hardening
 
