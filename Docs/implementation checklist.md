@@ -151,13 +151,13 @@ This checklist is divided into phases so one developer can build the complete ba
 
 ## Phase 11: Documentation And API Contracts
 
-- [ ] Add OpenAPI document for every route.
-- [ ] Add request/response examples for frontend, shopkeeper, and admin routes.
-- [ ] Add Postman/Bruno collection.
-- [ ] Add local setup guide.
-- [ ] Add seed account credentials for development.
-- [ ] Document all environment variables.
-- [ ] Document deployment steps and migration process.
+- [x] Add OpenAPI document for every route.
+- [x] Add request/response examples for frontend, shopkeeper, and admin routes.
+- [x] Add Postman/Bruno collection.
+- [x] Add local setup guide.
+- [x] Add seed account credentials for development.
+- [x] Document all environment variables.
+- [x] Document deployment steps and migration process.
 
 ## Phase 12: Production Readiness
 

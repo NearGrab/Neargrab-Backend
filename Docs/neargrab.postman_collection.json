@@ -1,0 +1,1233 @@
+{
+  "info": {
+    "_postman_id": "c1f7b76a-54e7-40b9-8e2b-236b2803bcf7",
+    "name": "Neargrab API Collection",
+    "description": "Complete Postman collection for Neargrab hyper-local product discovery APIs.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "User Signup",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Arion Test\",\n  \"email\": \"customer@example.com\",\n  \"phone\": \"9876543210\",\n  \"password\": \"Password123!\",\n  \"city\": \"Navsari\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "signup"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data) {",
+                  "    pm.collectionVariables.set(\"accessToken\", jsonData.data.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", jsonData.data.refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "User Login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@neargrab.test\",\n  \"password\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data) {",
+                  "    pm.collectionVariables.set(\"accessToken\", jsonData.data.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", jsonData.data.refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "OTP Request",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"+919900000001\",\n  \"purpose\": \"LOGIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/otp/request",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "otp", "request"]
+            }
+          }
+        },
+        {
+          "name": "OTP Verify",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"+919900000001\",\n  \"purpose\": \"LOGIN\",\n  \"code\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/otp/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "otp", "verify"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data && jsonData.data.accessToken) {",
+                  "    pm.collectionVariables.set(\"accessToken\", jsonData.data.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", jsonData.data.refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token Rotation",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "refresh"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data) {",
+                  "    pm.collectionVariables.set(\"accessToken\", jsonData.data.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", jsonData.data.refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout Current Session",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User & Profile",
+      "item": [
+        {
+          "name": "Fetch User Data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "me"]
+            }
+          }
+        },
+        {
+          "name": "Update Basic Fields",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Aarav Customer Updated\",\n  \"city\": \"Navsari\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "me"]
+            }
+          }
+        },
+        {
+          "name": "Get Profile Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "me", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Profile Bio",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bio\": \"Living locally and buying fresh products!\",\n  \"language\": \"en-IN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "me", "profile"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Explore & Search",
+      "item": [
+        {
+          "name": "List Categories",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories?includeCounts=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "categories"],
+              "query": [
+                {
+                  "key": "includeCounts",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Brands",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/brands?includeCounts=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "brands"],
+              "query": [
+                {
+                  "key": "includeCounts",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Home Explore Feed",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/explore?city=Navsari",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "explore"],
+              "query": [
+                {
+                  "key": "city",
+                  "value": "Navsari"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Product Search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/search/products?q=butter&city=Navsari",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "search", "products"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "butter"
+                },
+                {
+                  "key": "city",
+                  "value": "Navsari"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Suggestions",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/search/suggestions?q=but&city=Navsari",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "search", "suggestions"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "but"
+                },
+                {
+                  "key": "city",
+                  "value": "Navsari"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products & Shops",
+      "item": [
+        {
+          "name": "Product Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/amul-butter-500g",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "products", "amul-butter-500g"]
+            }
+          }
+        },
+        {
+          "name": "Find Other Stores Selling Product",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/amul-butter-500g/stores?city=Navsari",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "products", "amul-butter-500g", "stores"],
+              "query": [
+                {
+                  "key": "city",
+                  "value": "Navsari"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Shop Public Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shops/patel-daily-mart",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shops", "patel-daily-mart"]
+            }
+          }
+        },
+        {
+          "name": "Shop Products List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shops/patel-daily-mart/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shops", "patel-daily-mart", "products"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "item": [
+        {
+          "name": "Get Cart",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cart",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cart"]
+            }
+          }
+        },
+        {
+          "name": "Add Item to Cart",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"seed-product-id-placeholder\",\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cart/items",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cart", "items"]
+            }
+          }
+        },
+        {
+          "name": "Update Cart Item Quantity",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cart/items/item-id-placeholder",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cart", "items", "item-id-placeholder"]
+            }
+          }
+        },
+        {
+          "name": "Remove Cart Item",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cart/items/item-id-placeholder",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cart", "items", "item-id-placeholder"]
+            }
+          }
+        },
+        {
+          "name": "Clear Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cart",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cart"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reservations",
+      "item": [
+        {
+          "name": "Create Reservation (Direct)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"direct\",\n  \"productId\": \"seed-product-id-placeholder\",\n  \"quantity\": 1,\n  \"customerNote\": \"Please keep this ready by 6 PM\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reservations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "reservations"]
+            }
+          }
+        },
+        {
+          "name": "Create Reservation (Cart)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"cart\",\n  \"shopId\": \"seed-shop-id-placeholder\",\n  \"customerNote\": \"Will pick up in 1 hour\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reservations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "reservations"]
+            }
+          }
+        },
+        {
+          "name": "List User Reservations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reservations?status=REQUESTED",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "reservations"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "REQUESTED"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Reservation Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reservations/res-id-placeholder",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "reservations", "res-id-placeholder"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Reservation",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Changed my mind\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reservations/res-id-placeholder/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "reservations", "res-id-placeholder", "cancel"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications?read=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications"],
+              "query": [
+                {
+                  "key": "read",
+                  "value": "false"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark All as Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/read-all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications", "read-all"]
+            }
+          }
+        },
+        {
+          "name": "Get Notification Preferences",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications", "preferences"]
+            }
+          }
+        },
+        {
+          "name": "Update Preference Toggle",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"email\",\n  \"enabled\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications", "preferences"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shopkeeper Onboarding",
+      "item": [
+        {
+          "name": "Get Onboarding State",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/onboarding",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "onboarding"]
+            }
+          }
+        },
+        {
+          "name": "Step 1: Start Onboarding Draft",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Patel Grocer\",\n  \"username\": \"patel-grocer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/onboarding",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "onboarding"]
+            }
+          }
+        },
+        {
+          "name": "Step 2: Update Shop Details",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Patel Grocer\",\n  \"username\": \"patel-grocer\",\n  \"categoryId\": \"cat-grocery\",\n  \"type\": \"Retail Store\",\n  \"establishedYear\": 2020,\n  \"description\": \"Locally sourced organic products and daily grocery essentials.\",\n  \"logoMediaId\": \"media-logo-cuid\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/onboarding/details",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "onboarding", "details"]
+            }
+          }
+        },
+        {
+          "name": "Step 3: Update Address",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"street\": \"12 GIDC road\",\n  \"landmark\": \"Near temple\",\n  \"city\": \"Navsari\",\n  \"state\": \"Gujarat\",\n  \"pincode\": \"396445\",\n  \"coordinates\": {\n    \"lat\": 20.9416,\n    \"lng\": 72.9522\n  },\n  \"radius\": \"5 km\",\n  \"serviceRadiusKm\": 5.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/onboarding/address",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "onboarding", "address"]
+            }
+          }
+        },
+        {
+          "name": "Step 4: Update Contact & Timings",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"9876543210\",\n  \"whatsapp\": \"9876543210\",\n  \"alternatePhone\": \"9876543211\",\n  \"email\": \"patel@example.com\",\n  \"openingTime\": \"09:00 AM\",\n  \"closingTime\": \"09:00 PM\",\n  \"weekdays\": [\"Mon\", \"Tue\", \"Wed\", \"Thu\", \"Fri\", \"Sat\"],\n  \"preferences\": {\n    \"acceptCalls\": true,\n    \"enableStockRequests\": true,\n    \"receiveNotifications\": true\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/onboarding/contact",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "onboarding", "contact"]
+            }
+          }
+        },
+        {
+          "name": "Step 5: Update Business Info",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gstNumber\": \"24ABCDE1234F1Z5\",\n  \"panNumber\": \"ABCDE1234F\",\n  \"languages\": [\"Gujarati\", \"Hindi\", \"English\"],\n  \"priceRange\": \"Budget Friendly\",\n  \"homeDelivery\": true,\n  \"digitalPayments\": true,\n  \"upiId\": \"patel@upi\",\n  \"tags\": [\"Organic\", \"Daily Fresh\"],\n  \"registrationDocMediaId\": \"media-doc-cuid\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/onboarding/business",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "onboarding", "business"]
+            }
+          }
+        },
+        {
+          "name": "Step 6: Update Photos",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"logoMediaId\": \"media-logo-cuid\",\n  \"coverMediaId\": \"media-cover-cuid\",\n  \"photos\": [\n    { \"mediaId\": \"media-front-cuid\", \"kind\": \"front\", \"sortOrder\": 0 },\n    { \"mediaId\": \"media-inside-cuid\", \"kind\": \"inside\", \"sortOrder\": 0 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/onboarding/photos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "onboarding", "photos"]
+            }
+          }
+        },
+        {
+          "name": "Step 7: Final Submit Draft",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/onboarding/submit",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "onboarding", "submit"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shopkeeper Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard Summary Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "dashboard"]
+            }
+          }
+        },
+        {
+          "name": "Get Merchant Shop Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Shop Details",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Premium organic foods and farm fresh dairy product catalog.\",\n  \"tags\": [\"Organic\", \"Fast Delivery\", \"Super Fresh\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Get Weekly Timings Schedule",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/profile/timings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "profile", "timings"]
+            }
+          }
+        },
+        {
+          "name": "Replace Timings Schedule",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  { \"weekday\": 0, \"opensAt\": \"09:00\", \"closesAt\": \"21:00\", \"isClosed\": false },\n  { \"weekday\": 1, \"opensAt\": \"09:00\", \"closesAt\": \"21:00\", \"isClosed\": false },\n  { \"weekday\": 2, \"opensAt\": \"09:00\", \"closesAt\": \"21:00\", \"isClosed\": false },\n  { \"weekday\": 3, \"opensAt\": \"09:00\", \"closesAt\": \"21:00\", \"isClosed\": false },\n  { \"weekday\": 4, \"opensAt\": \"09:00\", \"closesAt\": \"21:00\", \"isClosed\": false },\n  { \"weekday\": 5, \"opensAt\": \"09:00\", \"closesAt\": \"21:00\", \"isClosed\": false },\n  { \"weekday\": 6, \"opensAt\": \"09:00\", \"closesAt\": \"18:00\", \"isClosed\": true }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/profile/timings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "profile", "timings"]
+            }
+          }
+        },
+        {
+          "name": "List Store Inventory Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/products?q=oil",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "products"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "oil"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Product to Inventory Catalog",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Fortune Sunlite Oil 1L\",\n  \"sku\": \"FORTUNE-SUN-1L\",\n  \"categoryId\": \"seed-grocery-category-id\",\n  \"brandId\": \"seed-generic-brand-id\",\n  \"description\": \"Refined sunflower oil for cooking.\",\n  \"size\": \"1\",\n  \"unit\": \"Litre\",\n  \"tags\": [\"Cooking Oil\", \"Sunflower\"],\n  \"pricePaise\": 15000,\n  \"mrpPaise\": 18000,\n  \"stockStatus\": \"IN_STOCK\",\n  \"stockAvailable\": true,\n  \"stockCount\": 25,\n  \"attributes\": [\n    { \"key\": \"Pack Type\", \"value\": \"Pouch\" }\n  ],\n  \"imageMediaIds\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "products"]
+            }
+          }
+        },
+        {
+          "name": "List Store Reservations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/reservations?status=REQUESTED",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "reservations"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "REQUESTED"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Accept Reservation Request",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACCEPTED\",\n  \"shopkeeperNote\": \"Your items are set aside at the counter.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shopkeeper/reservations/res-id-placeholder/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shopkeeper", "reservations", "res-id-placeholder", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin Panel",
+      "item": [
+        {
+          "name": "Admin Auth Login",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@neargrab.test\",\n  \"password\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data) {",
+                  "    pm.collectionVariables.set(\"accessToken\", jsonData.data.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", jsonData.data.refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fetch Admin Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "me"]
+            }
+          }
+        },
+        {
+          "name": "Get Admin Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "dashboard"]
+            }
+          }
+        },
+        {
+          "name": "Get Users Audit Log (Super Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/audit-logs",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "audit-logs"]
+            }
+          }
+        },
+        {
+          "name": "Verify Shop Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACTIVE\",\n  \"verificationStatus\": \"VERIFIED\",\n  \"reason\": \"All document parameters verified against registry.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/shops/shop-id-placeholder/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "shops", "shop-id-placeholder", "verify"]
+            }
+          }
+        },
+        {
+          "name": "Pin Product to Search Layout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/products/product-id-placeholder/pin",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "products", "product-id-placeholder", "pin"]
+            }
+          }
+        },
+        {
+          "name": "Create Advertising Banner",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Summer Grocery Sale\",\n  \"city\": \"Navsari\",\n  \"section\": \"TOP_HERO\",\n  \"status\": \"ACTIVE\",\n  \"devices\": [\"MOBILE\", \"DESKTOP\"],\n  \"plan\": \"PREMIUM\",\n  \"startAt\": \"2026-06-10T00:00:00.000Z\",\n  \"endAt\": \"2026-06-30T00:00:00.000Z\",\n  \"sortOrder\": 1,\n  \"shopId\": \"seed-shop-id-placeholder\",\n  \"mediaId\": \"seed-banner-image-media-id\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/banners",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "banners"]
+            }
+          }
+        },
+        {
+          "name": "Pin Advertising Banner",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/banners/banner-id-placeholder/pin",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "banners", "banner-id-placeholder", "pin"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Media Uploads",
+      "item": [
+        {
+          "name": "Upload Single File",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/media/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "media", "upload"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Upload Files",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/media/upload/bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "media", "upload", "bulk"]
+            }
+          }
+        },
+        {
+          "name": "Delete Media Asset",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/media/media-id-placeholder",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "media", "media-id-placeholder"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

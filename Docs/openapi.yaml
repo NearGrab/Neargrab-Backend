@@ -1,0 +1,4439 @@
+openapi: 3.0.3
+info:
+  title: Neargrab Backend API
+  version: 1.0.0
+  description: Complete API documentation for Neargrab, a hyper-local product discovery platform.
+servers:
+  - url: http://localhost:5000
+    description: Local development server base URL
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the status of the service and database connectivity.
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: ok
+                      service:
+                        type: string
+                        example: backend
+                      timestamp:
+                        type: string
+                        format: date-time
+                        example: "2026-06-08T12:00:00.000Z"
+
+  /api/v1/meta:
+    get:
+      summary: Fetch metadata
+      description: Returns list of supported cities, categories, and brands to initialize frontend state.
+      security: []
+      responses:
+        '200':
+          description: Metadata retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetaResponse'
+
+  /api/v1/seed-preview:
+    get:
+      summary: Seed preview for testing
+      description: Returns seeded entity summary (development environment only).
+      security: []
+      responses:
+        '200':
+          description: Seed summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+
+  /api/v1/auth/signup:
+    post:
+      tags:
+        - Auth
+      summary: User Signup
+      description: Create a new user profile, auth account, and default preferences.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - password
+                - city
+              properties:
+                name:
+                  type: string
+                  example: Aarav Customer
+                email:
+                  type: string
+                  format: email
+                  example: customer@example.com
+                phone:
+                  type: string
+                  example: "+919900000001"
+                password:
+                  type: string
+                  example: Password123!
+                city:
+                  type: string
+                  example: Navsari
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/400Error'
+
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: User Login
+      description: Authenticate user with email/phone and password.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: customer@neargrab.test
+                phone:
+                  type: string
+                  example: "+919900000001"
+                password:
+                  type: string
+                  example: Password123!
+      responses:
+        '200':
+          description: Authenticated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/401Error'
+
+  /api/v1/auth/google:
+    post:
+      tags:
+        - Auth
+      summary: Google OAuth Login
+      description: Authenticate with Google OAuth token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - idToken
+              properties:
+                idToken:
+                  type: string
+                  example: mock-google-token
+                email:
+                  type: string
+                  example: google-user@example.com
+                name:
+                  type: string
+                  example: Google User
+                providerUserId:
+                  type: string
+                  example: google-user-id
+      responses:
+        '200':
+          description: Authenticated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /api/v1/auth/otp/request:
+    post:
+      tags:
+        - Auth
+      summary: Request OTP
+      description: Generate a 6-digit verification code.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - identifier
+                - purpose
+              properties:
+                identifier:
+                  type: string
+                  example: "+919900000001"
+                purpose:
+                  type: string
+                  enum: [LOGIN, SIGNUP, PASSWORD_RESET, PHONE_VERIFY, EMAIL_VERIFY]
+                  example: LOGIN
+      responses:
+        '200':
+          description: OTP requested successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      expiresAt:
+                        type: string
+                        format: date-time
+                        example: "2026-06-08T12:15:00.000Z"
+                      code:
+                        type: string
+                        description: Present in non-production environments only
+                        example: "123456"
+
+  /api/v1/auth/otp/verify:
+    post:
+      tags:
+        - Auth
+      summary: Verify OTP
+      description: Complete login/signup or verifications using the 6-digit code.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - identifier
+                - purpose
+                - code
+              properties:
+                identifier:
+                  type: string
+                  example: "+919900000001"
+                purpose:
+                  type: string
+                  enum: [LOGIN, SIGNUP, PASSWORD_RESET, PHONE_VERIFY, EMAIL_VERIFY]
+                  example: LOGIN
+                code:
+                  type: string
+                  example: "123456"
+      responses:
+        '200':
+          description: OTP verified successfully
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/AuthResponse'
+                  - type: object
+                    properties:
+                      success:
+                        type: boolean
+                        example: true
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                            example: true
+
+  /api/v1/auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: Rotate Token
+      description: Issue new access and refresh token using existing valid refresh token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+                  example: "40-byte-hex-refresh-token"
+      responses:
+        '200':
+          description: Tokens rotated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      accessToken:
+                        type: string
+                      refreshToken:
+                        type: string
+
+  /api/v1/auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: Logout Current Session
+      description: Revoke current refresh token session.
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccess'
+
+  /api/v1/auth/logout-all:
+    post:
+      tags:
+        - Auth
+      summary: Logout All Sessions
+      description: Revoke all active login sessions.
+      responses:
+        '200':
+          description: Logged out of all devices successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccess'
+
+  /api/v1/auth/password/forgot:
+    post:
+      tags:
+        - Auth
+      summary: Forgot Password
+      description: Request reset OTP for a password reset.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: customer@neargrab.test
+      responses:
+        '200':
+          description: Reset code sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccess'
+
+  /api/v1/auth/password/reset:
+    post:
+      tags:
+        - Auth
+      summary: Reset Password
+      description: Reset password using code.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - code
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: customer@neargrab.test
+                code:
+                  type: string
+                  example: "123456"
+                password:
+                  type: string
+                  example: NewPassword123!
+      responses:
+        '200':
+          description: Password reset completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccess'
+
+  /api/v1/me:
+    get:
+      tags:
+        - User & Profile
+      summary: Fetch Current User
+      description: Returns profile, basic info, and owned shop details if any.
+      responses:
+        '200':
+          description: Profile loaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUserResponse'
+    patch:
+      tags:
+        - User & Profile
+      summary: Update Basic Fields
+      description: Update user profile basics.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Aarav Patel
+                username:
+                  type: string
+                  example: aaravpatel
+                city:
+                  type: string
+                  example: Surat
+      responses:
+        '200':
+          description: Updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUserResponse'
+    delete:
+      tags:
+        - User & Profile
+      summary: Deactivate Account
+      description: Soft delete the user account and terminate all sessions.
+      responses:
+        '200':
+          description: Account deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccess'
+
+  /api/v1/me/profile:
+    get:
+      tags:
+        - User & Profile
+      summary: Fetch Profile Details
+      description: Retrieve user profile bio, language, and other info.
+      responses:
+        '200':
+          description: Profile fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+    patch:
+      tags:
+        - User & Profile
+      summary: Update Profile Details
+      description: Update profile bio, settings, preferences.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bio:
+                  type: string
+                  example: Tech enthusiast
+                language:
+                  type: string
+                  example: en-IN
+                dateOfBirth:
+                  type: string
+                  format: date
+                  example: "1995-12-15"
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+
+  /api/v1/me/settings:
+    get:
+      tags:
+        - User & Profile
+      summary: Fetch Settings
+      description: Retrieve user privacy configurations and notification channel rules.
+      responses:
+        '200':
+          description: Settings loaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettingsResponse'
+    patch:
+      tags:
+        - User & Profile
+      summary: Update Settings
+      description: Update user settings parameters.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                privacyJson:
+                  type: object
+                  example: { "showEmail": false }
+                notificationPreferences:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - channel
+                      - type
+                      - enabled
+                    properties:
+                      channel:
+                        type: string
+                        example: EMAIL
+                      type:
+                        type: string
+                        example: PROMO
+                      enabled:
+                        type: boolean
+                        example: false
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettingsResponse'
+
+  /api/v1/categories:
+    get:
+      tags:
+        - Explore
+      summary: Get Categories
+      description: List active categories.
+      security: []
+      parameters:
+        - name: includeCounts
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: parentId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            default: active
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+
+  /api/v1/brands:
+    get:
+      tags:
+        - Explore
+      summary: Get Brands
+      description: List active brands.
+      security: []
+      parameters:
+        - name: includeCounts
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            default: active
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Brand'
+
+  /api/v1/explore:
+    get:
+      tags:
+        - Explore
+      summary: Get Explore Feed
+      description: Generates home discovery feed (carousels, nearby shops, products).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: latitude
+          in: query
+          required: false
+          schema:
+            type: number
+            format: float
+        - name: longitude
+          in: query
+          required: false
+          schema:
+            type: number
+            format: float
+        - name: radiusKm
+          in: query
+          required: false
+          schema:
+            type: number
+            format: float
+            default: 10
+        - name: device
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [WEB, IOS, ANDROID, ALL]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreFeedResponse'
+
+  /api/v1/search/products:
+    get:
+      tags:
+        - Search
+      summary: Product Search
+      description: Search products using text queries, locations, and filters.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: latitude
+          in: query
+          required: false
+          schema:
+            type: number
+            format: float
+        - name: longitude
+          in: query
+          required: false
+          schema:
+            type: number
+            format: float
+        - name: radiusKm
+          in: query
+          required: false
+          schema:
+            type: number
+            format: float
+        - name: categoryId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: categorySlug
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: brandId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: brandSlug
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: stockStatus
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [IN_STOCK, LOW_STOCK, OUT_OF_STOCK]
+        - name: inStock
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: minPricePaise
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: maxPricePaise
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [relevance, distance, rating, price_asc, price_desc, newest, popular]
+            default: relevance
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchProductsResponse'
+
+  /api/v1/search/suggestions:
+    get:
+      tags:
+        - Search
+      summary: Search Suggestions
+      description: Get autocomplete query suggestions.
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Suggestions payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchSuggestionsResponse'
+
+  /api/v1/search/events:
+    post:
+      tags:
+        - Search
+      summary: Track Search Event
+      description: Log analytics tracking for search executions.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+                - resultCount
+              properties:
+                query:
+                  type: string
+                  example: butter
+                city:
+                  type: string
+                  example: Navsari
+                latitude:
+                  type: number
+                  format: float
+                longitude:
+                  type: number
+                  format: float
+                radiusKm:
+                  type: number
+                  format: float
+                filters:
+                  type: object
+                resultCount:
+                  type: integer
+                  example: 3
+      responses:
+        '200':
+          description: Logged successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: "search-event-id-123"
+
+  /api/v1/product-requests:
+    post:
+      tags:
+        - Search
+      summary: Request Missing Product
+      description: Create a request for items that are missing or out of stock.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  example: "iPhone 16 charger"
+                categoryId:
+                  type: string
+                productId:
+                  type: string
+                city:
+                  type: string
+                  example: Navsari
+                latitude:
+                  type: number
+                  format: float
+                longitude:
+                  type: number
+                  format: float
+                radiusKm:
+                  type: number
+                  format: float
+      responses:
+        '200':
+          description: Request created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      query:
+                        type: string
+                      status:
+                        type: string
+                      city:
+                        type: string
+                      createdAt:
+                        type: string
+
+  /api/v1/products/{productId}:
+    get:
+      tags:
+        - Products
+      summary: Get Product Details
+      description: Returns full product attributes, shop information, reviews rating summaries.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetailResponse'
+
+  /api/v1/products/{productId}/stores:
+    get:
+      tags:
+        - Products
+      summary: Find Other Stores
+      description: Returns other local stores selling the same product.
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: latitude
+          in: query
+          required: false
+          schema:
+            type: number
+        - name: longitude
+          in: query
+          required: false
+          schema:
+            type: number
+        - name: radiusKm
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 10
+      responses:
+        '200':
+          description: Stores list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductStoreLink'
+
+  /api/v1/products/{productId}/similar:
+    get:
+      tags:
+        - Products
+      summary: Get Similar Products
+      description: Returns active products in the same category or brand.
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Similar products list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductCard'
+
+  /api/v1/products/{productId}/reviews:
+    get:
+      tags:
+        - Products
+      summary: List Reviews
+      description: Paginated reviews for a product.
+      security: []
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+        - name: rating
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [newest, oldest, rating_high, rating_low]
+      responses:
+        '200':
+          description: Reviews array
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewsListResponse'
+    post:
+      tags:
+        - Products
+      summary: Add Review
+      description: Create a product review.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - rating
+                - comment
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  example: 5
+                comment:
+                  type: string
+                  example: "Highly recommended, fresh!"
+                reservationId:
+                  type: string
+                mediaIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Created review object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Review'
+
+  /api/v1/products/{productId}/view:
+    post:
+      tags:
+        - Products
+      summary: Track View
+      description: Increment view counter analytics.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+                - shopId
+              properties:
+                source:
+                  type: string
+                  example: SEARCH
+                shopId:
+                  type: string
+                  example: "shop-123"
+      responses:
+        '200':
+          description: Logged view
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccess'
+
+  /api/v1/products/{productId}/save:
+    post:
+      tags:
+        - Products
+      summary: Save Product
+      description: Save product in favorite list.
+      responses:
+        '200':
+          description: Saved state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      saved:
+                        type: boolean
+                        example: true
+    delete:
+      tags:
+        - Products
+      summary: Unsave Product
+      description: Remove product from favorite list.
+      responses:
+        '200':
+          description: Unsaved state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      saved:
+                        type: boolean
+                        example: false
+
+  /api/v1/products/{productId}/feedback:
+    post:
+      tags:
+        - Products
+      summary: Product Feedback
+      description: Report issue or details inaccuracy.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+                - subject
+                - message
+              properties:
+                type:
+                  type: string
+                  example: PRODUCT_REPORT
+                subject:
+                  type: string
+                  example: "Incorrect image"
+                message:
+                  type: string
+                  example: "The image is for another pack size"
+                metadata:
+                  type: object
+      responses:
+        '200':
+          description: Feedback ticket created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+
+  /api/v1/shops/{shopId}:
+    get:
+      tags:
+        - Shops
+      summary: Get Shop Profile
+      description: Returns address, contact details, payment rules, timings, tags and metrics.
+      security: []
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Profile loaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShopProfileResponse'
+
+  /api/v1/shops/{shopId}/products:
+    get:
+      tags:
+        - Shops
+      summary: Shop Catalog
+      description: Returns products matching the shop storefront.
+      security: []
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Products catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchProductsResponse'
+
+  /api/v1/shops/{shopId}/reviews:
+    get:
+      tags:
+        - Shops
+      summary: List Shop Reviews
+      description: Paginated reviews for a shop.
+      security: []
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Reviews array
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewsListResponse'
+    post:
+      tags:
+        - Shops
+      summary: Create Shop Review
+      description: Submit a review for the store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - rating
+                - comment
+              properties:
+                rating:
+                  type: integer
+                  example: 5
+                comment:
+                  type: string
+                  example: "Excellent service!"
+                reservationId:
+                  type: string
+                mediaIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Review created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Review'
+
+  /api/v1/shops/{shopId}/updates:
+    get:
+      tags:
+        - Shops
+      summary: Shop Updates
+      description: Broadcast updates / deals published by store.
+      security: []
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Updates feed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ShopUpdate'
+
+  /api/v1/shops/{shopId}/lead:
+    post:
+      tags:
+        - Shops
+      summary: Track Lead Click
+      description: Log calls, directions clicks, and map opens.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+                - action
+              properties:
+                source:
+                  type: string
+                  example: SHOP_PROFILE
+                productId:
+                  type: string
+                action:
+                  type: string
+                  example: WHATSAPP_CLICK
+                metadata:
+                  type: object
+      responses:
+        '200':
+          description: Lead tracked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccess'
+
+  /api/v1/cart:
+    get:
+      tags:
+        - Cart
+      summary: Fetch Active Cart
+      description: Get active shopping cart. Returns a blank one if not initialized.
+      responses:
+        '200':
+          description: Cart details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+    delete:
+      tags:
+        - Cart
+      summary: Clear Cart
+      description: Remove all items in the active cart.
+      responses:
+        '200':
+          description: Cart cleared
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+
+  /api/v1/cart/items:
+    post:
+      tags:
+        - Cart
+      summary: Add to Cart
+      description: Add an item or increment quantity in the cart.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - productId
+                - quantity
+              properties:
+                productId:
+                  type: string
+                  example: "prod-789"
+                quantity:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          description: Updated cart details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+
+  /api/v1/cart/items/{itemId}:
+    patch:
+      tags:
+        - Cart
+      summary: Update Item Quantity
+      description: Set absolute quantity for a cart item.
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - quantity
+              properties:
+                quantity:
+                  type: integer
+                  example: 3
+      responses:
+        '200':
+          description: Updated cart details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+    delete:
+      tags:
+        - Cart
+      summary: Remove Cart Item
+      description: Detach item from active cart.
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Updated cart details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+
+  /api/v1/reservations:
+    post:
+      tags:
+        - Reservations
+      summary: Create Reservation
+      description: Reserve items directly or convert cart selections.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: string
+                  enum: [direct, cart]
+                  example: direct
+                productId:
+                  type: string
+                  description: Required if source is direct
+                quantity:
+                  type: integer
+                  description: Required if source is direct
+                shopId:
+                  type: string
+                  description: Required if source is cart
+                customerNote:
+                  type: string
+                  example: "Keep it aside till evening"
+      responses:
+        '200':
+          description: Created reservation detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+    get:
+      tags:
+        - Reservations
+      summary: List Reservations
+      description: Get paginated reservations.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [REQUESTED, ACCEPTED, COMPLETED, CANCELLED, EXPIRED]
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of reservations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationsListResponse'
+
+  /api/v1/reservations/expire:
+    post:
+      tags:
+        - Reservations
+      summary: Trigger Reservation Expirations
+      description: Scan and flag active reservations that exceeded bounds (Admin only).
+      responses:
+        '200':
+          description: Expiry batch details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      count:
+                        type: integer
+                        example: 3
+                      ids:
+                        type: array
+                        items:
+                          type: string
+
+  /api/v1/reservations/{reservationId}:
+    get:
+      tags:
+        - Reservations
+      summary: Get Reservation
+      description: Retrieve reservation details.
+      parameters:
+        - name: reservationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reservation object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+
+  /api/v1/reservations/{reservationId}/cancel:
+    patch:
+      tags:
+        - Reservations
+      summary: Cancel Reservation
+      description: Cancel a reservation (allowed when REQUESTED/ACCEPTED).
+      parameters:
+        - name: reservationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  example: "Found alternative"
+      responses:
+        '200':
+          description: Cancelled reservation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+
+  /api/v1/notifications:
+    get:
+      tags:
+        - Notifications
+      summary: Fetch Notifications
+      description: Get paginated notifications feed.
+      parameters:
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: read
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Notifications feed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationsListResponse'
+
+  /api/v1/notifications/read-all:
+    patch:
+      tags:
+        - Notifications
+      summary: Read All Notifications
+      description: Mark all notifications as read.
+      responses:
+        '200':
+          description: Read counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      updatedCount:
+                        type: integer
+                        example: 5
+
+  /api/v1/notifications/{notificationId}/read:
+    patch:
+      tags:
+        - Notifications
+      summary: Mark Single Read
+      description: Set read = true on a notification.
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Notification'
+
+  /api/v1/notifications/{notificationId}:
+    delete:
+      tags:
+        - Notifications
+      summary: Delete Notification
+      description: Detach/remove notification record.
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted flag
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      deleted:
+                        type: boolean
+                        example: true
+
+  /api/v1/notifications/preferences:
+    get:
+      tags:
+        - Notifications
+      summary: Get Channel Preferences
+      description: Returns configuration matrices for alerts channels.
+      responses:
+        '200':
+          description: Preferences configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferencesResponse'
+    patch:
+      tags:
+        - Notifications
+      summary: Update Preferences
+      description: Toggle a UI key preference or specify bulk channels array.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                key:
+                  type: string
+                  example: email
+                enabled:
+                  type: boolean
+                  example: false
+                preferences:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      channel:
+                        type: string
+                      type:
+                        type: string
+                      enabled:
+                        type: boolean
+      responses:
+        '200':
+          description: Updated preference state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferencesResponse'
+
+  /api/v1/shopkeeper/onboarding:
+    get:
+      tags:
+        - Shopkeeper Onboarding
+      summary: Get Onboarding State
+      description: Check completion states, missing tags/fields, and current draft profile.
+      responses:
+        '200':
+          description: Onboarding state payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingStateResponse'
+    post:
+      tags:
+        - Shopkeeper Onboarding
+      summary: Start Onboarding Draft
+      description: Initialize a draft shop record in the wizard.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - username
+              properties:
+                name:
+                  type: string
+                  example: Patel Grocer
+                username:
+                  type: string
+                  example: patel-grocer
+      responses:
+        '201':
+          description: Created onboarding draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingStateResponse'
+
+  /api/v1/shopkeeper/onboarding/details:
+    patch:
+      tags:
+        - Shopkeeper Onboarding
+      summary: Onboarding - Details
+      description: Set basic descriptions, year established, and categorizations.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                username:
+                  type: string
+                categoryId:
+                  type: string
+                type:
+                  type: string
+                establishedYear:
+                  type: integer
+                description:
+                  type: string
+                logoMediaId:
+                  type: string
+      responses:
+        '200':
+          description: Wizard state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingStateResponse'
+
+  /api/v1/shopkeeper/onboarding/address:
+    patch:
+      tags:
+        - Shopkeeper Onboarding
+      summary: Onboarding - Address
+      description: Set geolocation and service coverage coordinates.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - coordinates
+              properties:
+                street:
+                  type: string
+                landmark:
+                  type: string
+                city:
+                  type: string
+                state:
+                  type: string
+                pincode:
+                  type: string
+                coordinates:
+                  type: object
+                  required:
+                    - lat
+                    - lng
+                  properties:
+                    lat:
+                      type: number
+                    lng:
+                      type: number
+                radius:
+                  type: string
+                serviceRadiusKm:
+                  type: number
+      responses:
+        '200':
+          description: Wizard state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingStateResponse'
+
+  /api/v1/shopkeeper/onboarding/contact:
+    patch:
+      tags:
+        - Shopkeeper Onboarding
+      summary: Onboarding - Contact & timings
+      description: Recreate weekly timetables and set contact coordinates.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone:
+                  type: string
+                whatsapp:
+                  type: string
+                alternatePhone:
+                  type: string
+                email:
+                  type: string
+                openingTime:
+                  type: string
+                closingTime:
+                  type: string
+                weekdays:
+                  type: array
+                  items:
+                    type: string
+                preferences:
+                  type: object
+      responses:
+        '200':
+          description: Wizard state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingStateResponse'
+
+  /api/v1/shopkeeper/onboarding/business:
+    patch:
+      tags:
+        - Shopkeeper Onboarding
+      summary: Onboarding - Business Info
+      description: Verify tax registrations, languages spoken, and payout details.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                gstNumber:
+                  type: string
+                panNumber:
+                  type: string
+                languages:
+                  type: array
+                  items:
+                    type: string
+                priceRange:
+                  type: string
+                homeDelivery:
+                  type: boolean
+                digitalPayments:
+                  type: boolean
+                upiId:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+                registrationDocMediaId:
+                  type: string
+      responses:
+        '200':
+          description: Wizard state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingStateResponse'
+
+  /api/v1/shopkeeper/onboarding/photos:
+    patch:
+      tags:
+        - Shopkeeper Onboarding
+      summary: Onboarding - Photos
+      description: Bind media items to storefront logo, covers, and inside portfolios.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                logoMediaId:
+                  type: string
+                coverMediaId:
+                  type: string
+                photos:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      mediaId:
+                        type: string
+                      kind:
+                        type: string
+                      sortOrder:
+                        type: integer
+      responses:
+        '200':
+          description: Wizard state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingStateResponse'
+
+  /api/v1/shopkeeper/onboarding/submit:
+    post:
+      tags:
+        - Shopkeeper Onboarding
+      summary: Submit Onboarding
+      description: Submit completed wizard. Upgrades role and flags profile for admin verification.
+      responses:
+        '200':
+          description: Submission confirmation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      shop:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          status:
+                            type: string
+                            example: PENDING_REVIEW
+                          verificationStatus:
+                            type: string
+                            example: PENDING
+
+  /api/v1/shopkeeper/dashboard:
+    get:
+      tags:
+        - Shopkeeper Dashboard
+      summary: Dashboard Stats
+      description: Get active sales metrics, low stock indicators, reviews summary.
+      responses:
+        '200':
+          description: Metrics dashboard payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShopkeeperDashboardResponse'
+
+  /api/v1/shopkeeper/profile:
+    get:
+      tags:
+        - Shopkeeper Dashboard
+      summary: Get Own Shop
+      description: Returns merchant's own shop details.
+      responses:
+        '200':
+          description: Shop profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShopProfileResponse'
+    patch:
+      tags:
+        - Shopkeeper Dashboard
+      summary: Update Shop Profile
+      description: Edit shop details, locations, contact rules, payment configurations, or tags.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                logoMediaId:
+                  type: string
+                coverMediaId:
+                  type: string
+                address:
+                  type: object
+                contact:
+                  type: object
+                paymentMethods:
+                  type: array
+                  items:
+                    type: object
+                languages:
+                  type: array
+                  items:
+                    type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Updated shop details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShopProfileResponse'
+
+  /api/v1/shopkeeper/profile/timings:
+    get:
+      tags:
+        - Shopkeeper Dashboard
+      summary: Get timings
+      description: Get shop weekly schedule.
+      responses:
+        '200':
+          description: Timings array
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+  /api/v1/shopkeeper/profile/timings_put:
+    put:
+      path: /api/v1/shopkeeper/profile/timings
+      tags:
+        - Shopkeeper Dashboard
+      summary: Replace timings
+      description: Atomically replace the weekly 7-day timing schedule.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                required:
+                  - weekday
+                  - opensAt
+                  - closesAt
+                  - isClosed
+                properties:
+                  weekday:
+                    type: integer
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                  isClosed:
+                    type: boolean
+      responses:
+        '200':
+          description: Updated timings array
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+
+  /api/v1/shopkeeper/reviews:
+    get:
+      tags:
+        - Shopkeeper Dashboard
+      summary: Get Shop Reviews
+      description: Paginated reviews feed for store.
+      parameters:
+        - name: rating
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Reviews feed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewsListResponse'
+
+  /api/v1/shopkeeper/leads:
+    get:
+      tags:
+        - Shopkeeper Dashboard
+      summary: Get Leads Logs
+      description: Paginated directions clicks / call logs for store.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Leads log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+
+  /api/v1/shopkeeper/reservations:
+    get:
+      tags:
+        - Shopkeeper Dashboard
+      summary: List Store Reservations
+      description: Returns incoming reservation orders from clients.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Reservations payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationsListResponse'
+
+  /api/v1/shopkeeper/reservations/{reservationId}/status:
+    patch:
+      tags:
+        - Shopkeeper Dashboard
+      summary: Update Reservation Status
+      description: Transition reservation status (e.g., ACCEPTED, REJECTED, COMPLETED).
+      parameters:
+        - name: reservationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [ACCEPTED, REJECTED, COMPLETED, CANCELLED]
+                shopkeeperNote:
+                  type: string
+      responses:
+        '200':
+          description: Updated reservation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+
+  /api/v1/shopkeeper/products:
+    get:
+      tags:
+        - Shopkeeper Dashboard
+      summary: List Store Catalog
+      description: Search / pagination of merchant's products.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: categoryId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: stockStatus
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Catalog list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductCard'
+    post:
+      tags:
+        - Shopkeeper Dashboard
+      summary: Add Product
+      description: Create a product in store inventory catalog.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - pricePaise
+                - categoryId
+              properties:
+                name:
+                  type: string
+                  example: Fortune Sunlite Oil 1L
+                sku:
+                  type: string
+                categoryId:
+                  type: string
+                brandId:
+                  type: string
+                description:
+                  type: string
+                size:
+                  type: string
+                unit:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+                pricePaise:
+                  type: integer
+                mrpPaise:
+                  type: integer
+                stockStatus:
+                  type: string
+                  enum: [IN_STOCK, LOW_STOCK, OUT_OF_STOCK]
+                stockAvailable:
+                  type: boolean
+                stockCount:
+                  type: integer
+                attributes:
+                  type: array
+                  items:
+                    type: object
+                imageMediaIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Created product
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/ProductCard'
+
+  /api/v1/shopkeeper/products/bulk:
+    post:
+      tags:
+        - Shopkeeper Dashboard
+      summary: Bulk Adjustments
+      description: Perform status changes or delete multiple products at once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - productIds
+                - action
+              properties:
+                productIds:
+                  type: array
+                  items:
+                    type: string
+                action:
+                  type: string
+                  enum: [toggle_stock, delete, status_change]
+                stockAvailable:
+                  type: boolean
+                stockStatus:
+                  type: string
+      responses:
+        '200':
+          description: Affected count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      count:
+                        type: integer
+                        example: 2
+
+  /api/v1/shopkeeper/products/{productId}:
+    get:
+      tags:
+        - Shopkeeper Dashboard
+      summary: Get Store Product Details
+      description: Returns detailed catalog product object.
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/ProductDetail'
+    patch:
+      tags:
+        - Shopkeeper Dashboard
+      summary: Update Product Details
+      description: Edit pricing, attributes, categories, and tags.
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                pricePaise:
+                  type: integer
+                mrpPaise:
+                  type: integer
+                description:
+                  type: string
+                stockCount:
+                  type: integer
+      responses:
+        '200':
+          description: Updated product details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/ProductDetail'
+    delete:
+      tags:
+        - Shopkeeper Dashboard
+      summary: Soft Delete Product
+      description: Deletes the product from store catalog (sets status = DELETED).
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccess'
+
+  /api/v1/shopkeeper/products/{productId}/stock:
+    patch:
+      tags:
+        - Shopkeeper Dashboard
+      summary: Quick Stock Toggle
+      description: Adjust stock status, available flag and counts.
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                stockAvailable:
+                  type: boolean
+                stockCount:
+                  type: integer
+                stockStatus:
+                  type: string
+      responses:
+        '200':
+          description: Updated product details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/ProductDetail'
+
+  /api/v1/shopkeeper/products/{productId}/images:
+    post:
+      tags:
+        - Shopkeeper Dashboard
+      summary: Attach Product Image
+      description: Bind an uploaded media asset to a catalog product.
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - mediaId
+              properties:
+                mediaId:
+                  type: string
+                alt:
+                  type: string
+                sortOrder:
+                  type: integer
+      responses:
+        '200':
+          description: Attached details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+
+  /api/v1/shopkeeper/products/{productId}/images/{imageId}:
+    delete:
+      tags:
+        - Shopkeeper Dashboard
+      summary: Detach Image
+      description: Unbind image attachment.
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: imageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccess'
+
+  /api/v1/admin/auth/login:
+    post:
+      tags:
+        - Admin Panel
+      summary: Admin Portal Login
+      description: Authentication specifically for administrative staff.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@neargrab.test
+                password:
+                  type: string
+                  example: Password123!
+      responses:
+        '200':
+          description: Admin session established
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /api/v1/admin/me:
+    get:
+      tags:
+        - Admin Panel
+      summary: Admin Identity
+      description: Get active admin user profile details.
+      responses:
+        '200':
+          description: Identity details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUserResponse'
+
+  /api/v1/admin/dashboard:
+    get:
+      tags:
+        - Admin Panel
+      summary: Platform Summary
+      description: Global stats, system metrics, cities lead generation and review tickets count.
+      responses:
+        '200':
+          description: Platform summary stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDashboardResponse'
+
+  /api/v1/admin/users:
+    get:
+      tags:
+        - Admin Panel
+      summary: Admin - List Users
+      description: Search and filter registered users.
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: role
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Users array
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+
+  /api/v1/admin/users/{userId}:
+    get:
+      tags:
+        - Admin Panel
+      summary: Admin - User Details
+      description: Fetch complete user files.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Profile payload
+          content:
+            application/json:
+              schema:
+                type: object
+    patch:
+      tags:
+        - Admin Panel
+      summary: Admin - Update User
+      description: Toggle permissions, user status, or roles.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                role:
+                  type: string
+                status:
+                  type: string
+      responses:
+        '200':
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                type: object
+    delete:
+      tags:
+        - Admin Panel
+      summary: Admin - Hard Delete
+      description: Permanently scrub user record.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted flag
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccess'
+
+  /api/v1/admin/shops:
+    get:
+      tags:
+        - Admin Panel
+      summary: Admin - List Shops
+      description: Moderation search panel for merchant profiles.
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: verificationStatus
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Shops array
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/admin/shops/{shopId}:
+    get:
+      tags:
+        - Admin Panel
+      summary: Admin - Shop Detail
+      description: Get detailed documents verification catalog.
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Shop details
+
+  /api/v1/admin/shops/{shopId}/verify:
+    patch:
+      tags:
+        - Admin Panel
+      summary: Admin - Verify Shop
+      description: Approve or reject draft/review shops. Triggers user upgrade notifications.
+      parameters:
+        - name: shopId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+                - verificationStatus
+              properties:
+                status:
+                  type: string
+                  example: ACTIVE
+                verificationStatus:
+                  type: string
+                  example: VERIFIED
+                reason:
+                  type: string
+                  example: Verified license.
+      responses:
+        '200':
+          description: Action complete
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/admin/products:
+    get:
+      tags:
+        - Admin Panel
+      summary: Admin - List Products
+      description: View catalog global products table.
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Products catalog list
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/admin/products/bulk:
+    patch:
+      tags:
+        - Admin Panel
+      summary: Admin - Bulk Moderate
+      description: Suspend, flag, or approve batches of products.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - productIds
+              properties:
+                productIds:
+                  type: array
+                  items:
+                    type: string
+                isFlagged:
+                  type: boolean
+                status:
+                  type: string
+      responses:
+        '200':
+          description: Bulk complete
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/admin/products/{productId}:
+    patch:
+      tags:
+        - Admin Panel
+      summary: Admin - Moderate Product
+      description: Flag details or block single products.
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                isFlagged:
+                  type: boolean
+                status:
+                  type: string
+      responses:
+        '200':
+          description: Product details updated
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/admin/pin-rules:
+    get:
+      tags:
+        - Admin Panel
+      summary: Admin - Pin Rules
+      description: Get active rules and quotas regarding banner or item placement by city.
+      responses:
+        '200':
+          description: Limit parameters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /api/v1/admin/products/{productId}/pin:
+    post:
+      tags:
+        - Admin Panel
+      summary: Admin - Pin Product
+      description: Stick item to category home page limits.
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product pinned
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/admin/products/{productId}/unpin:
+    post:
+      tags:
+        - Admin Panel
+      summary: Admin - Unpin Product
+      description: Unstick catalog item.
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product unpinned
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/admin/banners:
+    get:
+      tags:
+        - Admin Panel
+      summary: Admin - List Banners
+      description: Query banner advertisement cards.
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Banners array
+          content:
+            application/json:
+              schema:
+                type: object
+    post:
+      tags:
+        - Admin Panel
+      summary: Admin - Create Banner
+      description: Setup banner campaign details.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - city
+                - section
+                - status
+                - devices
+                - plan
+                - mediaId
+              properties:
+                title:
+                  type: string
+                city:
+                  type: string
+                section:
+                  type: string
+                status:
+                  type: string
+                devices:
+                  type: array
+                  items:
+                    type: string
+                plan:
+                  type: string
+                startAt:
+                  type: string
+                endAt:
+                  type: string
+                sortOrder:
+                  type: integer
+                shopId:
+                  type: string
+                mediaId:
+                  type: string
+      responses:
+        '200':
+          description: Banner configured
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/admin/banners/metrics:
+    get:
+      tags:
+        - Admin Panel
+      summary: Admin - Banners Metrics
+      description: Retrieve performance click-through aggregations and financial earnings.
+      responses:
+        '200':
+          description: Metrics totals
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/admin/banners/performance:
+    get:
+      tags:
+        - Admin Panel
+      summary: Admin - Banner Impressions Log
+      description: Graph aggregates by calendar days.
+      responses:
+        '200':
+          description: Daily logs
+
+  /api/v1/admin/banners/{bannerId}:
+    get:
+      tags:
+        - Admin Panel
+      summary: Admin - Banner Detail
+      description: Fetch banner details.
+      parameters:
+        - name: bannerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Details payload
+    patch:
+      tags:
+        - Admin Panel
+      summary: Admin - Edit Banner
+      description: Change placements or timing parameters.
+      parameters:
+        - name: bannerId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Updated banner
+    delete:
+      tags:
+        - Admin Panel
+      summary: Admin - Delete Banner
+      description: Clear banner assets.
+      parameters:
+        - name: bannerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccess'
+
+  /api/v1/admin/banners/{bannerId}/pin:
+    post:
+      tags:
+        - Admin Panel
+      summary: Admin - Pin Banner
+      description: Pins a banner to the city layout.
+      parameters:
+        - name: bannerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Pinned success
+
+  /api/v1/admin/banners/{bannerId}/unpin:
+    post:
+      tags:
+        - Admin Panel
+      summary: Admin - Unpin Banner
+      description: Unpins a banner.
+      parameters:
+        - name: bannerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Unpinned success
+
+  /api/v1/admin/content:
+    get:
+      tags:
+        - Admin Panel
+      summary: Admin - Content Pages
+      description: Retrieve editable static pages (About, Terms).
+      responses:
+        '200':
+          description: Pages inventory
+
+  /api/v1/admin/content/{key}:
+    patch:
+      tags:
+        - Admin Panel
+      summary: Admin - Edit Static Page
+      description: Overwrite key JSON blocks formatting (Privacy policy etc).
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - content
+              properties:
+                title:
+                  type: string
+                content:
+                  type: object
+      responses:
+        '200':
+          description: Modified successfully
+
+  /api/v1/admin/reviews:
+    get:
+      tags:
+        - Admin Panel
+      summary: Admin - Review moderation
+      description: Filter client reviews.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List array
+
+  /api/v1/admin/reviews/{reviewId}:
+    patch:
+      tags:
+        - Admin Panel
+      summary: Admin - moderate review
+      description: Flag, approve, or censor reviews.
+      parameters:
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+      responses:
+        '200':
+          description: Review moderated
+
+  /api/v1/admin/feedback:
+    get:
+      tags:
+        - Admin Panel
+      summary: Admin - List Feedback
+      description: View bug report / feature request log.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tickets array
+
+  /api/v1/admin/feedback/{feedbackId}:
+    patch:
+      tags:
+        - Admin Panel
+      summary: Admin - Moderate Feedback
+      description: Resolve or process ticket details.
+      parameters:
+        - name: feedbackId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Ticket updated
+
+  /api/v1/admin/audit-logs:
+    get:
+      tags:
+        - Admin Panel
+      summary: Admin - View Audit Logs
+      description: Super Admin ledger details of system modifications.
+      responses:
+        '200':
+          description: Audit logs array
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogsResponse'
+
+  /api/v1/media/upload:
+    post:
+      tags:
+        - Media Uploads
+      summary: Upload Single File
+      description: Write single binary image to local storage or Cloudinary.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: File uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/MediaAsset'
+
+  /api/v1/media/upload/bulk:
+    post:
+      tags:
+        - Media Uploads
+      summary: Bulk Upload Files
+      description: Upload multiple files in a single request (maximum 10).
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - files
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        '201':
+          description: Uploaded array of assets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MediaAsset'
+
+  /api/v1/media/{mediaId}:
+    delete:
+      tags:
+        - Media Uploads
+      summary: Delete Media Asset
+      description: Remove asset. Blocks deletion if references exist in other tables.
+      parameters:
+        - name: mediaId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccess'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    400Error:
+      description: Bad Request / Validation Failure
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AppError'
+    401Error:
+      description: Unauthenticated
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AppError'
+    403Error:
+      description: Forbidden / Role Access Blocked
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AppError'
+    404Error:
+      description: Entity Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AppError'
+  schemas:
+    AppError:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          required:
+            - statusCode
+            - code
+            - message
+          properties:
+            statusCode:
+              type: integer
+              example: 400
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: "Input validation failed"
+            details:
+              type: object
+              example: { "field": "email must be valid" }
+
+    SimpleSuccess:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required:
+            - success
+          properties:
+            success:
+              type: boolean
+              example: true
+
+    AuthResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required:
+            - user
+            - accessToken
+            - refreshToken
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            accessToken:
+              type: string
+              example: "eyJhbGciOi..."
+            refreshToken:
+              type: string
+              example: "40-byte-hex-refresh-token"
+
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - username
+        - role
+        - status
+        - city
+      properties:
+        id:
+          type: string
+          example: "cuid-string"
+        name:
+          type: string
+          example: Aarav Customer
+        username:
+          type: string
+          example: aarav-customer
+        email:
+          type: string
+          example: customer@neargrab.test
+        phone:
+          type: string
+          example: "+919900000001"
+        role:
+          type: string
+          example: CUSTOMER
+        status:
+          type: string
+          example: ACTIVE
+        city:
+          type: string
+          example: Navsari
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CurrentUserResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          allOf:
+            - $ref: '#/components/schemas/User'
+            - type: object
+              properties:
+                profile:
+                  $ref: '#/components/schemas/UserProfile'
+                shop:
+                  type: object
+                  nullable: true
+
+    UserProfileResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/UserProfile'
+
+    UserProfile:
+      type: object
+      required:
+        - id
+        - userId
+      properties:
+        id:
+          type: string
+          example: "profile-id-123"
+        userId:
+          type: string
+          example: "user-id-abc"
+        bio:
+          type: string
+          example: "I love local shopping."
+        language:
+          type: string
+          example: "en-IN"
+        dateOfBirth:
+          type: string
+          format: date-time
+        privacyJson:
+          type: object
+        preferencesJson:
+          type: object
+
+    UserSettingsResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            privacyJson:
+              type: object
+            preferencesJson:
+              type: object
+            notificationPreferences:
+              type: array
+              items:
+                type: object
+
+    MetaResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required:
+            - cities
+            - categories
+            - brands
+          properties:
+            cities:
+              type: array
+              items:
+                type: string
+                example: Navsari
+            categories:
+              type: array
+              items:
+                $ref: '#/components/schemas/Category'
+            brands:
+              type: array
+              items:
+                $ref: '#/components/schemas/Brand'
+
+    Category:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+      properties:
+        id:
+          type: string
+          example: cat_1
+        name:
+          type: string
+          example: Grocery
+        slug:
+          type: string
+          example: grocery
+        icon:
+          type: string
+          example: grocery-icon
+        parentId:
+          type: string
+          nullable: true
+        productCount:
+          type: integer
+          example: 12
+
+    Brand:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+      properties:
+        id:
+          type: string
+          example: brand_1
+        name:
+          type: string
+          example: Amul
+        slug:
+          type: string
+          example: amul
+        productCount:
+          type: integer
+          example: 4
+
+    ExploreFeedResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required:
+            - city
+            - categories
+            - nearbyShops
+            - topProducts
+            - pinnedProducts
+            - banners
+          properties:
+            city:
+              type: string
+              example: Navsari
+            categories:
+              type: array
+              items:
+                $ref: '#/components/schemas/Category'
+            nearbyShops:
+              type: array
+              items:
+                $ref: '#/components/schemas/ShopProfile'
+            topProducts:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProductCard'
+            pinnedProducts:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProductCard'
+            banners:
+              type: array
+              items:
+                $ref: '#/components/schemas/Banner'
+            sections:
+              type: object
+
+    ShopProfile:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+        - status
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+        verificationStatus:
+          type: string
+        ratingAvg:
+          type: number
+        ratingCount:
+          type: integer
+
+    ProductCard:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+        - pricePaise
+        - stockStatus
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        pricePaise:
+          type: integer
+        mrpPaise:
+          type: integer
+        stockStatus:
+          type: string
+        stockAvailable:
+          type: boolean
+        ratingAvg:
+          type: number
+        reviewCount:
+          type: integer
+        image:
+          type: object
+          properties:
+            id:
+              type: string
+            url:
+              type: string
+        shop:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            city:
+              type: string
+
+    Banner:
+      type: object
+      required:
+        - id
+        - title
+        - status
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+        imageUrl:
+          type: string
+
+    SearchProductsResponse:
+      type: object
+      required:
+        - success
+        - data
+        - meta
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductCard'
+        meta:
+          type: object
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+            totalPages:
+              type: integer
+
+    SearchSuggestionsResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            products:
+              type: array
+              items:
+                type: object
+            categories:
+              type: array
+            brands:
+              type: array
+
+    ProductDetailResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/ProductDetail'
+
+    ProductDetail:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+        - pricePaise
+        - stockStatus
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        sku:
+          type: string
+        description:
+          type: string
+        size:
+          type: string
+        unit:
+          type: string
+        pricePaise:
+          type: integer
+        mrpPaise:
+          type: integer
+        stockStatus:
+          type: string
+        stockAvailable:
+          type: boolean
+        ratingAvg:
+          type: number
+        reviewCount:
+          type: integer
+        images:
+          type: array
+          items:
+            type: object
+        attributes:
+          type: array
+          items:
+            type: object
+        category:
+          type: object
+        brand:
+          type: object
+        shop:
+          type: object
+        reviewSummary:
+          type: object
+
+    ProductStoreLink:
+      type: object
+      required:
+        - product
+        - shop
+      properties:
+        product:
+          type: object
+        shop:
+          type: object
+        distanceKm:
+          type: number
+
+    ReviewsListResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Review'
+
+    Review:
+      type: object
+      required:
+        - id
+        - rating
+        - comment
+      properties:
+        id:
+          type: string
+        rating:
+          type: integer
+        comment:
+          type: string
+        verifiedPurchase:
+          type: boolean
+        createdAt:
+          type: string
+        user:
+          type: object
+
+    ShopProfileResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          allOf:
+            - $ref: '#/components/schemas/ShopProfile'
+            - type: object
+              properties:
+                address:
+                  type: object
+                contact:
+                  type: object
+                timings:
+                  type: array
+                  items:
+                    type: object
+                paymentMethods:
+                  type: array
+                  items:
+                    type: object
+
+    ShopUpdate:
+      type: object
+      required:
+        - id
+        - title
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+
+    CartResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+            status:
+              type: string
+            items:
+              type: array
+              items:
+                type: object
+            summary:
+              type: object
+
+    ReservationResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+            status:
+              type: string
+            totalPaise:
+              type: integer
+            items:
+              type: array
+              items:
+                type: object
+
+    ReservationsListResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            type: object
+
+    NotificationsListResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+
+    Notification:
+      type: object
+      required:
+        - id
+        - type
+        - title
+        - message
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        read:
+          type: boolean
+        createdAt:
+          type: string
+
+    NotificationPreferencesResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            preferences:
+              type: array
+              items:
+                type: object
+            ui:
+              type: object
+
+    OnboardingStateResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            shop:
+              type: object
+              nullable: true
+            completion:
+              type: object
+
+    ShopkeeperDashboardResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            shopProfile:
+              type: object
+            stats:
+              type: array
+              items:
+                type: object
+
+    AdminDashboardResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            systemSummary:
+              type: object
+            totals:
+              type: object
+            topCities:
+              type: array
+              items:
+                type: object
+
+    AuditLogsResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLog'
+
+    AuditLog:
+      type: object
+      required:
+        - id
+        - action
+        - entityType
+        - createdAt
+      properties:
+        id:
+          type: string
+        action:
+          type: string
+        entityType:
+          type: string
+        before:
+          type: object
+        after:
+          type: object
+        actor:
+          type: object
+
+    MediaAsset:
+      type: object
+      required:
+        - id
+        - ownerId
+        - url
+        - key
+        - bucket
+        - mimeType
+        - sizeBytes
+      properties:
+        id:
+          type: string
+        ownerId:
+          type: string
+        url:
+          type: string
+        key:
+          type: string
+        bucket:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+        width:
+          type: integer
+          nullable: true
+        height:
+          type: integer
+          nullable: true
+        altText:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
