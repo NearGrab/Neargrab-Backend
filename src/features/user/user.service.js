@@ -39,6 +39,26 @@ async function getMe(userId) {
 async function updateMe(userId, fields) {
   const prisma = getPrisma();
 
+  if (fields.avatarId) {
+    const media = await prisma.mediaAsset.findUnique({
+      where: { id: fields.avatarId },
+    });
+    if (!media) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.MEDIA_NOT_FOUND,
+        message: "Avatar media asset not found",
+      });
+    }
+    if (media.ownerId && media.ownerId !== userId) {
+      throw new AppError({
+        statusCode: 403,
+        code: ERROR_CODES.MEDIA_FORBIDDEN,
+        message: "You do not own this media asset",
+      });
+    }
+  }
+
   if (fields.username) {
     const existing = await prisma.user.findFirst({
       where: {

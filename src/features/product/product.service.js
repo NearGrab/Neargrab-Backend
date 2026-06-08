@@ -434,6 +434,29 @@ async function createProductReview(productIdOrSlug, input, user) {
   }
 
   const { rating, comment, reservationId, mediaIds = [] } = input;
+
+  if (mediaIds && mediaIds.length > 0) {
+    const assets = await prisma.mediaAsset.findMany({
+      where: { id: { in: mediaIds } },
+    });
+    if (assets.length !== mediaIds.length) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.MEDIA_NOT_FOUND,
+        message: "Some media assets were not found",
+      });
+    }
+    for (const asset of assets) {
+      if (asset.ownerId && asset.ownerId !== user.id) {
+        throw new AppError({
+          statusCode: 403,
+          code: ERROR_CODES.MEDIA_FORBIDDEN,
+          message: "You do not own this media asset",
+        });
+      }
+    }
+  }
+
   let verifiedPurchase = false;
 
   if (reservationId) {

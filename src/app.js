@@ -9,6 +9,7 @@ const {
   generalLimiter,
 } = require("./middleware/security.middleware");
 const routes = require("./routes");
+const env = require("./config/env");
 const notFoundMiddleware = require("./middleware/not-found.middleware");
 const errorMiddleware = require("./middleware/error.middleware");
 
@@ -28,6 +29,10 @@ app.use(urlEncodedMiddleware);
 
 // Rate limiting
 app.use(generalLimiter);
+
+if (env.UPLOAD_DRIVER === "local") {
+  app.use("/uploads", express.static(env.UPLOAD_DIR));
+}
 
 // App routes
 app.use(routes);

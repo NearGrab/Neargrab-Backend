@@ -687,6 +687,28 @@ async function createShopProduct(userId, input) {
   const prisma = getPrisma();
   const shop = await getShopkeeperShop(userId);
 
+  if (input.imageMediaIds && input.imageMediaIds.length > 0) {
+    const assets = await prisma.mediaAsset.findMany({
+      where: { id: { in: input.imageMediaIds } },
+    });
+    if (assets.length !== input.imageMediaIds.length) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.MEDIA_NOT_FOUND,
+        message: "Some media assets were not found",
+      });
+    }
+    for (const asset of assets) {
+      if (asset.ownerId && asset.ownerId !== userId) {
+        throw new AppError({
+          statusCode: 403,
+          code: ERROR_CODES.MEDIA_FORBIDDEN,
+          message: "You do not own this media asset",
+        });
+      }
+    }
+  }
+
   const {
     name,
     sku,
@@ -822,6 +844,28 @@ async function getShopProductDetail(userId, productId) {
 async function updateShopProduct(userId, productId, input) {
   const prisma = getPrisma();
   const shop = await getShopkeeperShop(userId);
+
+  if (input.imageMediaIds && input.imageMediaIds.length > 0) {
+    const assets = await prisma.mediaAsset.findMany({
+      where: { id: { in: input.imageMediaIds } },
+    });
+    if (assets.length !== input.imageMediaIds.length) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.MEDIA_NOT_FOUND,
+        message: "Some media assets were not found",
+      });
+    }
+    for (const asset of assets) {
+      if (asset.ownerId && asset.ownerId !== userId) {
+        throw new AppError({
+          statusCode: 403,
+          code: ERROR_CODES.MEDIA_FORBIDDEN,
+          message: "You do not own this media asset",
+        });
+      }
+    }
+  }
 
   const product = await prisma.product.findFirst({
     where: {
@@ -1049,6 +1093,14 @@ async function attachProductImage(userId, productId, input) {
       statusCode: 404,
       code: ERROR_CODES.MEDIA_NOT_FOUND,
       message: "Media asset not found",
+    });
+  }
+
+  if (mediaAsset.ownerId && mediaAsset.ownerId !== userId) {
+    throw new AppError({
+      statusCode: 403,
+      code: ERROR_CODES.MEDIA_FORBIDDEN,
+      message: "You do not own this media asset",
     });
   }
 

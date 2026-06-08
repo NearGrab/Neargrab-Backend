@@ -141,13 +141,13 @@ This checklist is divided into phases so one developer can build the complete ba
 
 ## Phase 10: Media And Upload Hardening
 
-- [ ] Implement single and bulk media upload.
-- [ ] Store local files under ignored upload directory in dev.
-- [ ] Add MIME and size validation.
-- [ ] Attach media to products, shops, banners, users, reviews.
-- [ ] Prevent deletion of referenced media.
-- [ ] Add production-ready adapter interface for S3/R2/Cloudinary.
-- [ ] Add tests for invalid file type and ownership.
+- [x] Implement single and bulk media upload.
+- [x] Store local files under ignored upload directory in dev.
+- [x] Add MIME and size validation.
+- [x] Attach media to products, shops, banners, users, reviews.
+- [x] Prevent deletion of referenced media.
+- [x] Add production-ready adapter interface for S3/R2/Cloudinary.
+- [x] Add tests for invalid file type and ownership.
 
 ## Phase 11: Documentation And API Contracts
 

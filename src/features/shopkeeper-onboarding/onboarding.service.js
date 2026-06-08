@@ -59,9 +59,17 @@ async function resolveMediaAsset(input, ownerId, tx = null) {
       where: { id: input },
     });
     if (existing) {
+      if (existing.ownerId && existing.ownerId !== ownerId) {
+        throw new AppError({
+          statusCode: 403,
+          code: ERROR_CODES.MEDIA_FORBIDDEN,
+          message: "You do not own this media asset",
+        });
+      }
       return existing.id;
     }
   } catch (err) {
+    if (err instanceof AppError) throw err;
     // Ignore any db constraints/errors and proceed
   }
 
