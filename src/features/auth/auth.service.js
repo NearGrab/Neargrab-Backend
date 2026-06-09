@@ -43,7 +43,7 @@ function getDefaultNotificationPrefs() {
 /**
  * Sign up a new user.
  */
-async function signup({ name, email, phone, password, city, userAgent = null, ipAddress = null }) {
+async function signup({ name, email, phone, password, city, username, userAgent = null, ipAddress = null }) {
   const prisma = getPrisma();
   const normalizedEmail = normalizeEmail(email);
   const trimmedPhone = phone ? phone.trim() : null;
@@ -78,16 +78,28 @@ async function signup({ name, email, phone, password, city, userAgent = null, ip
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  // Generate username candidate
-  const baseUsername = normalizedEmail
-    ? normalizedEmail.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "")
-    : `user_${Math.floor(100000 + Math.random() * 900000)}`;
-  
-  // Quick username uniqueness check
-  let username = baseUsername;
-  const existingUsername = await prisma.user.findUnique({ where: { username } });
-  if (existingUsername) {
-    username = `${baseUsername}_${Math.floor(1000 + Math.random() * 9000)}`;
+  let finalUsername = username ? username.trim().toLowerCase() : null;
+  if (finalUsername) {
+    const existingUsername = await prisma.user.findUnique({ where: { username: finalUsername } });
+    if (existingUsername) {
+      throw new AppError({
+        statusCode: 409,
+        code: ERROR_CODES.CONFLICT,
+        message: "Username is already taken",
+      });
+    }
+  } else {
+    // Generate username candidate
+    const baseUsername = normalizedEmail
+      ? normalizedEmail.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "")
+      : `user_${Math.floor(100000 + Math.random() * 900000)}`;
+    
+    let tempUsername = baseUsername;
+    const existingUsername = await prisma.user.findUnique({ where: { username: tempUsername } });
+    if (existingUsername) {
+      tempUsername = `${baseUsername}_${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+    finalUsername = tempUsername;
   }
 
   const user = await prisma.user.create({
@@ -97,7 +109,7 @@ async function signup({ name, email, phone, password, city, userAgent = null, ip
       phone: trimmedPhone,
       passwordHash,
       city: trimmedCity,
-      username,
+      username: finalUsername,
       profile: {
         create: {
           privacyJson: {},

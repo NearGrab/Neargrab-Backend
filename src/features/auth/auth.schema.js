@@ -23,6 +23,14 @@ const signupBody = z
       .min(8, "Password must be at least 8 characters long")
       .max(100),
     city: z.string().trim().optional(),
+    username: z
+      .string()
+      .trim()
+      .min(3, "Username must be at least 3 characters long")
+      .max(30, "Username must not exceed 30 characters")
+      .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain alphanumeric characters and underscores")
+      .optional()
+      .or(z.literal("")),
   })
   .refine((data) => (data.email && data.email !== "") || (data.phone && data.phone !== ""), {
     message: "Either email or phone is required",
