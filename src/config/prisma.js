@@ -9,6 +9,7 @@ function createPrismaClient() {
     log:
       env.NODE_ENV === "development"
         ? [
+            { emit: "event", level: "query" },
             { emit: "event", level: "error" },
             { emit: "event", level: "warn" },
           ]
@@ -28,6 +29,9 @@ function getPrisma() {
       prisma.$on("warn", (event) => {
         logger.warn({ prisma: event }, "Prisma warning");
       });
+      // prisma.$on("query", (event) => {
+      //   logger.info(`Prisma Query: ${event.query} - Duration: ${event.duration}ms`);
+      // });
     }
   }
 

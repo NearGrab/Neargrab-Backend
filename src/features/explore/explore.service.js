@@ -103,14 +103,13 @@ async function getExploreFeed(params) {
   const now = new Date();
   const hasLocation = latitude !== undefined && longitude !== undefined;
 
-  // 1. Fetch categories
-  const categories = await prisma.category.findMany({
+  // 1. Setup queries
+  const categoriesPromise = prisma.category.findMany({
     where: { parentId: null, status: "active", deletedAt: null },
     take: 12,
     orderBy: { name: "asc" },
   });
 
-  // 2. Fetch banners
   const bannerWhere = {
     status: "ACTIVE",
     deletedAt: null,
@@ -126,13 +125,12 @@ async function getExploreFeed(params) {
     bannerWhere.devices = { hasSome: [device, "ALL"] };
   }
 
-  const banners = await prisma.banner.findMany({
+  const bannersPromise = prisma.banner.findMany({
     where: bannerWhere,
     include: { image: true },
     orderBy: { sortOrder: "asc" },
   });
 
-  // 3. Setup shop filters
   const shopWhere = {
     status: "ACTIVE",
     deletedAt: null,
@@ -152,13 +150,99 @@ async function getExploreFeed(params) {
     };
   }
 
-  let shops = await prisma.shop.findMany({
+  const shopsPromise = prisma.shop.findMany({
     where: shopWhere,
     include: { address: true },
   });
 
-  // Haversine filter and distance attach
-  if (hasLocation) {
+  const productWhere = {
+    status: "ACTIVE",
+    deletedAt: null,
+    shop: { status: "ACTIVE", deletedAt: null },
+  };
+
+  if (city && !hasLocation) {
+    productWhere.shop = {
+      address: { city: { equals: city, mode: "insensitive" } },
+      status: "ACTIVE",
+      deletedAt: null,
+    };
+  }
+
+  let categories;
+  let banners;
+  let shops;
+  let pinnedProductsData;
+  let topProductsData;
+  let newArrivalsData;
+
+  if (!hasLocation) {
+    // Fetch everything in parallel
+    const [
+      resolvedCategories,
+      resolvedBanners,
+      resolvedShops,
+      resolvedPinned,
+      resolvedTop,
+      resolvedNew
+    ] = await Promise.all([
+      categoriesPromise,
+      bannersPromise,
+      shopsPromise,
+      prisma.product.findMany({
+        where: { ...productWhere, isPinned: true },
+        include: {
+          images: { include: { media: true } },
+          category: true,
+          brand: true,
+          shop: { include: { address: true } },
+        },
+        take: 8,
+        orderBy: { searchBoost: "desc" },
+      }),
+      prisma.product.findMany({
+        where: productWhere,
+        include: {
+          images: { include: { media: true } },
+          category: true,
+          brand: true,
+          shop: { include: { address: true } },
+        },
+        take: 8,
+        orderBy: [{ ratingAvg: "desc" }, { reviewCount: "desc" }],
+      }),
+      prisma.product.findMany({
+        where: productWhere,
+        include: {
+          images: { include: { media: true } },
+          category: true,
+          brand: true,
+          shop: { include: { address: true } },
+        },
+        take: 8,
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+
+    categories = resolvedCategories;
+    banners = resolvedBanners;
+    shops = resolvedShops;
+    pinnedProductsData = resolvedPinned;
+    topProductsData = resolvedTop;
+    newArrivalsData = resolvedNew;
+  } else {
+    // 1. Fetch categories, banners, and shops in parallel
+    const [resolvedCategories, resolvedBanners, resolvedShops] = await Promise.all([
+      categoriesPromise,
+      bannersPromise,
+      shopsPromise,
+    ]);
+
+    categories = resolvedCategories;
+    banners = resolvedBanners;
+    shops = resolvedShops;
+
+    // 2. Haversine filter and distance attach
     shops = shops
       .map((shop) => {
         const dist = calculateDistance(
@@ -171,66 +255,56 @@ async function getExploreFeed(params) {
       })
       .filter((shop) => shop.distanceKm <= radiusKm)
       .sort((a, b) => a.distanceKm - b.distanceKm);
+
+    const shopIds = shops.map((s) => s.id);
+    const productWhereWithLocation = {
+      ...productWhere,
+      shopId: { in: shopIds },
+    };
+
+    // 3. Fetch products in parallel using location filters
+    const [resolvedPinned, resolvedTop, resolvedNew] = await Promise.all([
+      prisma.product.findMany({
+        where: { ...productWhereWithLocation, isPinned: true },
+        include: {
+          images: { include: { media: true } },
+          category: true,
+          brand: true,
+          shop: { include: { address: true } },
+        },
+        take: 8,
+        orderBy: { searchBoost: "desc" },
+      }),
+      prisma.product.findMany({
+        where: productWhereWithLocation,
+        include: {
+          images: { include: { media: true } },
+          category: true,
+          brand: true,
+          shop: { include: { address: true } },
+        },
+        take: 8,
+        orderBy: [{ ratingAvg: "desc" }, { reviewCount: "desc" }],
+      }),
+      prisma.product.findMany({
+        where: productWhereWithLocation,
+        include: {
+          images: { include: { media: true } },
+          category: true,
+          brand: true,
+          shop: { include: { address: true } },
+        },
+        take: 8,
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+
+    pinnedProductsData = resolvedPinned;
+    topProductsData = resolvedTop;
+    newArrivalsData = resolvedNew;
   }
 
   const nearbyShops = shops.slice(0, 10);
-  const shopIds = shops.map((s) => s.id);
-
-  // 4. Setup products query filter
-  const productWhere = {
-    status: "ACTIVE",
-    deletedAt: null,
-    shop: { status: "ACTIVE", deletedAt: null },
-  };
-
-  if (hasLocation) {
-    productWhere.shopId = { in: shopIds };
-  } else if (city) {
-    productWhere.shop = {
-      address: { city: { equals: city, mode: "insensitive" } },
-      status: "ACTIVE",
-      deletedAt: null,
-    };
-  }
-
-  // Fetch pinned products
-  const pinnedProductsData = await prisma.product.findMany({
-    where: { ...productWhere, isPinned: true },
-    include: {
-      images: { include: { media: true } },
-      category: true,
-      brand: true,
-      shop: { include: { address: true } },
-    },
-    take: 8,
-    orderBy: { searchBoost: "desc" },
-  });
-
-  // Fetch top products (highest rated/reviewed)
-  const topProductsData = await prisma.product.findMany({
-    where: productWhere,
-    include: {
-      images: { include: { media: true } },
-      category: true,
-      brand: true,
-      shop: { include: { address: true } },
-    },
-    take: 8,
-    orderBy: [{ ratingAvg: "desc" }, { reviewCount: "desc" }],
-  });
-
-  // Fetch sections: topPicks, newArrivals, popularNearby
-  const newArrivalsData = await prisma.product.findMany({
-    where: productWhere,
-    include: {
-      images: { include: { media: true } },
-      category: true,
-      brand: true,
-      shop: { include: { address: true } },
-    },
-    take: 8,
-    orderBy: { createdAt: "desc" },
-  });
 
   // Map function for products (injecting distance if location exists)
   const attachDistAndMap = (prod) => {
@@ -252,7 +326,7 @@ async function getExploreFeed(params) {
     sections: {
       topPicks: topProductsData.map(attachDistAndMap),
       newArrivals: newArrivalsData.map(attachDistAndMap),
-      popularNearby: topProductsData.map(attachDistAndMap), // fallback or sorted by viewCount if needed
+      popularNearby: topProductsData.map(attachDistAndMap),
     },
   };
 }
