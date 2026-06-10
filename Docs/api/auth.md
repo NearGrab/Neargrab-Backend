@@ -347,6 +347,79 @@ Soft-delete the current user account and revoke all of their active sessions.
   }
   ```
 
+### 8. Fetch User Public Profile by Username
+Retrieve public stats, badges, and review stream of any user.
+- **Route**: `GET /api/v1/users/:username/profile`
+- **Auth**: Authenticated User
+- **Response Shape (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "profile-id-123",
+      "userId": "user-id-abc",
+      "bio": "I love local shopping.",
+      "user": {
+        "id": "user-id-abc",
+        "createdAt": "2026-06-05T21:47:35.000Z",
+        "name": "Aarav Customer",
+        "username": "aarav-customer",
+        "avatar": {
+          "url": "https://placehold.co/150"
+        }
+      },
+      "isFollowing": false,
+      "stats": {
+        "reviewsCount": 5,
+        "avgRatingGiven": 4.2,
+        "helpfulVotes": 12,
+        "shopsVisited": 3,
+        "areasExplored": 2,
+        "savedProductsCount": 8,
+        "followingCount": 10,
+        "followersCount": 15
+      },
+      "reviews": [],
+      "whoToFollow": [
+        {
+          "id": "cuid-another",
+          "name": "Jane Doe",
+          "username": "jane_doe",
+          "avatar": "https://placehold.co/150"
+        }
+      ]
+    }
+  }
+  ```
+
+### 9. Follow User
+Establish a connection to follow another user.
+- **Route**: `POST /api/v1/users/:userId/follow`
+- **Auth**: Authenticated User
+- **Response Shape (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "following": true
+    }
+  }
+  ```
+
+### 10. Unfollow User
+Terminate the follow connection to another user.
+- **Route**: `DELETE /api/v1/users/:userId/follow`
+- **Auth**: Authenticated User
+- **Response Shape (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "following": false
+    }
+  }
+  ```
+
 ---
 
 ## Seed Accounts (Development Only)

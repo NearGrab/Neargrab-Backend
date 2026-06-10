@@ -560,6 +560,93 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserSettingsResponse'
+ 
+  /api/v1/users/{username}/profile:
+    get:
+      tags:
+        - User & Profile
+      summary: Fetch User Public Profile by Username
+      description: Retrieve public stats, reviews, and badges of any user by their unique username.
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+            example: aarav-customer
+      responses:
+        '200':
+          description: Public profile fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicProfileResponse'
+        '404':
+          $ref: '#/components/responses/404Error'
+
+  /api/v1/users/{userId}/follow:
+    post:
+      tags:
+        - User & Profile
+      summary: Follow User
+      description: Create a follower-following connection to another user.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "user-id-abc"
+      responses:
+        '200':
+          description: Followed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      following:
+                        type: boolean
+                        example: true
+        '404':
+          $ref: '#/components/responses/404Error'
+    delete:
+      tags:
+        - User & Profile
+      summary: Unfollow User
+      description: Remove a follower-following connection to another user.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "user-id-abc"
+      responses:
+        '200':
+          description: Unfollowed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      following:
+                        type: boolean
+                        example: false
+        '404':
+          $ref: '#/components/responses/404Error'
 
   /api/v1/categories:
     get:
@@ -3743,6 +3830,97 @@ components:
           example: true
         data:
           $ref: '#/components/schemas/UserProfile'
+ 
+    PublicProfileResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              example: "profile-id-123"
+            userId:
+              type: string
+              example: "user-id-abc"
+            bio:
+              type: string
+              example: "I love local shopping."
+            user:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: "user-id-abc"
+                createdAt:
+                  type: string
+                  format: date-time
+                name:
+                  type: string
+                  example: "Aarav Customer"
+                username:
+                  type: string
+                  example: "aarav-customer"
+                avatar:
+                  type: object
+                  properties:
+                    url:
+                      type: string
+                      example: "https://placehold.co/150"
+            isFollowing:
+              type: boolean
+              example: false
+            stats:
+              type: object
+              properties:
+                reviewsCount:
+                  type: integer
+                  example: 5
+                avgRatingGiven:
+                  type: number
+                  format: float
+                  example: 4.2
+                helpfulVotes:
+                  type: integer
+                  example: 12
+                shopsVisited:
+                  type: integer
+                  example: 3
+                areasExplored:
+                  type: integer
+                  example: 2
+                savedProductsCount:
+                  type: integer
+                  example: 8
+                followingCount:
+                  type: integer
+                  example: 10
+                followersCount:
+                  type: integer
+                  example: 15
+            reviews:
+              type: array
+              items:
+                type: object
+            whoToFollow:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  username:
+                    type: string
+                  avatar:
+                    type: string
 
     UserProfile:
       type: object

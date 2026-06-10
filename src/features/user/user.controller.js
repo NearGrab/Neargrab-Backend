@@ -1,5 +1,6 @@
 const { sendSuccess } = require("../../lib/response");
 const userService = require("./user.service");
+const { AppError, ERROR_CODES } = require("../../lib/errors");
 
 /**
  * Handle GET /me request.
@@ -30,7 +31,7 @@ async function updateMe(req, res, next) {
  */
 async function getProfile(req, res, next) {
   try {
-    const result = await userService.getProfile(req.user.id);
+    const result = await userService.getProfile(req.user.id, req.user.id);
     return sendSuccess(res, result);
   } catch (error) {
     return next(error);
@@ -85,6 +86,50 @@ async function deactivateMe(req, res, next) {
   }
 }
 
+/**
+ * Handle GET /users/:username/profile request.
+ */
+async function getUserPublicProfile(req, res, next) {
+  try {
+    const targetUser = await userService.getUserByUsername(req.params.username);
+    if (!targetUser) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: "User not found",
+      });
+    }
+    const result = await userService.getProfile(targetUser.id, req.user?.id);
+    return sendSuccess(res, result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+/**
+ * Handle POST /users/:userId/follow request.
+ */
+async function followUser(req, res, next) {
+  try {
+    const result = await userService.followUser(req.user.id, req.params.userId);
+    return sendSuccess(res, result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+/**
+ * Handle DELETE /users/:userId/follow request.
+ */
+async function unfollowUser(req, res, next) {
+  try {
+    const result = await userService.unfollowUser(req.user.id, req.params.userId);
+    return sendSuccess(res, result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   getMe,
   updateMe,
@@ -93,4 +138,7 @@ module.exports = {
   getSettings,
   updateSettings,
   deactivateMe,
+  getUserPublicProfile,
+  followUser,
+  unfollowUser,
 };

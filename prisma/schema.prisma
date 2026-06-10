@@ -184,6 +184,21 @@ model User {
   shopLeads               ShopLead[]
   bannerImpressions       BannerImpression[]
   feedback                Feedback[]
+  followers               UserFollow[]             @relation("UserFollowers")
+  following               UserFollow[]             @relation("UserFollowing")
+}
+
+model UserFollow {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
 }
 
 model AuthAccount {

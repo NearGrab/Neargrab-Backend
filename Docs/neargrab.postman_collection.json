@@ -256,6 +256,42 @@
               "path": ["api", "v1", "me", "profile"]
             }
           }
+        },
+        {
+          "name": "Fetch Public Profile by Username",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/abdulkadir/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "abdulkadir", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Follow User",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/cmq8amxvi0000ijfzz5h1tole/follow",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "cmq8amxvi0000ijfzz5h1tole", "follow"]
+            }
+          }
+        },
+        {
+          "name": "Unfollow User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/cmq8amxvi0000ijfzz5h1tole/follow",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "cmq8amxvi0000ijfzz5h1tole", "follow"]
+            }
+          }
         }
       ]
     },

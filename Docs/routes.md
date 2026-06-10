@@ -38,6 +38,9 @@ Use JSON for all normal endpoints. File upload endpoints should accept `multipar
 | GET | `/me/settings` | Account/privacy/security settings | User |
 | PATCH | `/me/settings` | Update preferences/settings | User |
 | DELETE | `/me` | Deactivate own account | User |
+| GET | `/users/:username/profile` | Fetch public profile by username | User |
+| POST | `/users/:userId/follow` | Follow another user | User |
+| DELETE | `/users/:userId/follow` | Unfollow another user | User |
 
 ## Discovery And Explore
 

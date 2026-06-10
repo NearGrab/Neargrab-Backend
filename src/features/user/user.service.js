@@ -98,7 +98,7 @@ async function updateMe(userId, fields) {
 /**
  * Get user profile details.
  */
-async function getProfile(userId) {
+async function getProfile(userId, currentUserId = null) {
   const prisma = getPrisma();
   const profile = await prisma.userProfile.findUnique({
     where: { userId },
@@ -112,7 +112,236 @@ async function getProfile(userId) {
     });
   }
 
-  return profile;
+  // Fetch User basic info
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      createdAt: true,
+      name: true,
+      username: true,
+      avatarId: true,
+      city: true,
+      state: true,
+      avatar: {
+        select: { url: true }
+      }
+    }
+  });
+
+  // Fetch reviews count and average rating
+  const reviewsAgg = await prisma.review.aggregate({
+    where: { userId, status: "PUBLISHED" },
+    _count: { id: true },
+    _avg: { rating: true },
+  });
+
+  // Fetch helpful votes received by user's reviews
+  const helpfulVotesResult = await prisma.reviewVote.aggregate({
+    where: {
+      review: { userId },
+      value: { gt: 0 }
+    },
+    _sum: { value: true }
+  });
+
+  // Fetch unique shops visited
+  const reviewedShopIds = await prisma.review.findMany({
+    where: { userId, status: "PUBLISHED" },
+    select: { shopId: true },
+    distinct: ['shopId'],
+  });
+  const reservedShopIds = await prisma.reservation.findMany({
+    where: { userId },
+    select: { shopId: true },
+    distinct: ['shopId'],
+  });
+  const uniqueShopIds = new Set([
+    ...reviewedShopIds.map(r => r.shopId).filter(Boolean),
+    ...reservedShopIds.map(r => r.shopId).filter(Boolean),
+  ]);
+
+  // Fetch unique cities explored
+  const exploredCities = await prisma.review.findMany({
+    where: { userId, status: "PUBLISHED" },
+    select: {
+      shop: {
+        select: {
+          address: {
+            select: { city: true }
+          }
+        }
+      }
+    }
+  });
+  const uniqueCities = new Set(
+    exploredCities.map(e => e.shop?.address?.city).filter(Boolean)
+  );
+
+  // Fetch real reviews
+  const reviews = await prisma.review.findMany({
+    where: { userId, status: "PUBLISHED" },
+    include: {
+      shop: {
+        include: { address: true }
+      },
+      product: {
+        include: {
+          images: {
+            include: { media: true }
+          }
+        }
+      },
+      media: {
+        include: { media: true }
+      },
+      _count: {
+        select: { votes: true }
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+
+  // Fetch saved products count
+  const savedProductsCount = await prisma.savedProduct.count({
+    where: { userId }
+  });
+
+  // Fetch real followers and following counts
+  const followersCount = await prisma.userFollow.count({
+    where: { followingId: userId }
+  });
+  const followingCount = await prisma.userFollow.count({
+    where: { followerId: userId }
+  });
+
+  // Determine if the current viewer follows this user
+  let isFollowing = false;
+  const viewerId = currentUserId || userId;
+  if (currentUserId && currentUserId !== userId) {
+    const followRecord = await prisma.userFollow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId: currentUserId,
+          followingId: userId
+        }
+      }
+    });
+    isFollowing = !!followRecord;
+  }
+
+  // Fetch already following list to exclude from recommendations
+  const alreadyFollowing = await prisma.userFollow.findMany({
+    where: { followerId: viewerId },
+    select: { followingId: true }
+  });
+  const alreadyFollowingIds = alreadyFollowing.map(f => f.followingId);
+
+  // Fetch who to follow (other active users/customers in the system)
+  const otherUsers = await prisma.user.findMany({
+    where: {
+      id: {
+        notIn: [viewerId, ...alreadyFollowingIds]
+      },
+      role: "CUSTOMER",
+      status: "ACTIVE"
+    },
+    select: {
+      id: true,
+      name: true,
+      username: true,
+      avatar: { select: { url: true } }
+    },
+    take: 3
+  });
+
+  return {
+    ...profile,
+    user,
+    isFollowing,
+    stats: {
+      reviewsCount: reviewsAgg._count.id || 0,
+      avgRatingGiven: parseFloat((reviewsAgg._avg.rating || 0).toFixed(1)),
+      helpfulVotes: helpfulVotesResult._sum.value || 0,
+      shopsVisited: uniqueShopIds.size,
+      areasExplored: Math.max(1, uniqueCities.size),
+      savedProductsCount,
+      followingCount,
+      followersCount,
+    },
+    reviews,
+    whoToFollow: otherUsers.map(u => ({
+      id: u.id,
+      name: u.name,
+      username: u.username,
+      avatar: u.avatar?.url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
+    }))
+  };
+}
+
+/**
+ * Follow a user.
+ */
+async function followUser(followerId, followingId) {
+  if (followerId === followingId) {
+    throw new AppError({
+      statusCode: 400,
+      code: ERROR_CODES.BAD_REQUEST,
+      message: "You cannot follow yourself",
+    });
+  }
+
+  const prisma = getPrisma();
+
+  // Check if target user exists
+  const targetUser = await prisma.user.findUnique({
+    where: { id: followingId }
+  });
+  if (!targetUser) {
+    throw new AppError({
+      statusCode: 404,
+      code: ERROR_CODES.NOT_FOUND,
+      message: "User to follow not found",
+    });
+  }
+
+  await prisma.userFollow.upsert({
+    where: {
+      followerId_followingId: {
+        followerId,
+        followingId
+      }
+    },
+    update: {},
+    create: {
+      followerId,
+      followingId
+    }
+  });
+
+  return { following: true };
+}
+
+/**
+ * Unfollow a user.
+ */
+async function unfollowUser(followerId, followingId) {
+  const prisma = getPrisma();
+
+  try {
+    await prisma.userFollow.delete({
+      where: {
+        followerId_followingId: {
+          followerId,
+          followingId
+        }
+      }
+    });
+  } catch (err) {
+    // Ignore if not following
+  }
+
+  return { following: false };
 }
 
 /**
@@ -250,6 +479,17 @@ async function deactivateMe(userId) {
   return { success: true };
 }
 
+/**
+ * Find user by username.
+ */
+async function getUserByUsername(username) {
+  const prisma = getPrisma();
+  return prisma.user.findUnique({
+    where: { username },
+    select: { id: true }
+  });
+}
+
 module.exports = {
   getMe,
   updateMe,
@@ -258,4 +498,7 @@ module.exports = {
   getSettings,
   updateSettings,
   deactivateMe,
+  followUser,
+  unfollowUser,
+  getUserByUsername,
 };

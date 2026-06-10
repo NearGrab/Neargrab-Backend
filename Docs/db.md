@@ -45,7 +45,7 @@ Fields:
 - `status UserStatus @default(ACTIVE)`
 - `avatarId?`, `city?`, `state?`, `pincode?`
 - `emailVerifiedAt?`, `phoneVerifiedAt?`, `lastLoginAt?`
-- Relations: profile, auth accounts, sessions, shop, reviews, saved products, notifications, cart, reservations.
+- Relations: profile, auth accounts, sessions, shop, reviews, saved products, notifications, cart, reservations, followers (UserFollow), following (UserFollow).
 
 ### AuthAccount
 
@@ -75,6 +75,14 @@ Customer profile metadata.
 - `userId @unique`, `bio?`, `language?`, `dateOfBirth?`
 - `privacyJson Json?`, `preferencesJson Json?`
 - `impactScore Int @default(0)`
+
+### UserFollow
+
+Self-referencing many-to-many relationship model representing follow connections between customers/users.
+
+- `followerId`, `followingId`
+- Primary key: `[followerId, followingId]`
+- Relations: `follower` (User), `following` (User)
 
 ## Shops
 
