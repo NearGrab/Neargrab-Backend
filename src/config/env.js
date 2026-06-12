@@ -12,6 +12,7 @@ const envSchema = z
     DATABASE_URL: z.string().optional(),
     JWT_ACCESS_SECRET: z.string().optional(),
     JWT_REFRESH_SECRET: z.string().optional(),
+    SUPABASE_JWT_SECRET: z.string().optional(),
     ACCESS_TOKEN_TTL: z.string().default("15m"),
     REFRESH_TOKEN_TTL: z.string().default("30d"),
     CORS_ORIGINS: z
@@ -38,17 +39,20 @@ const envSchema = z
       return;
     }
 
-    ["DATABASE_URL", "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"].forEach(
-      (key) => {
-        if (!value[key]) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: [key],
-            message: `${key} is required in production`,
-          });
-        }
-      },
-    );
+    const requiredKeys = ["DATABASE_URL"];
+    if (!value.SUPABASE_JWT_SECRET) {
+      requiredKeys.push("JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET");
+    }
+
+    requiredKeys.forEach((key) => {
+      if (!value[key]) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required in production`,
+        });
+      }
+    });
   });
 
 const parsedEnv = envSchema.safeParse(process.env);
