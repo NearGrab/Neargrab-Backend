@@ -31,6 +31,7 @@ const mockPrisma = {
   },
   productView: {
     findMany: jest.fn().mockResolvedValue([]),
+    count: jest.fn().mockResolvedValue(0),
   },
   shopLead: {
     findMany: jest.fn().mockResolvedValue([]),
@@ -38,6 +39,7 @@ const mockPrisma = {
   },
   savedProduct: {
     findMany: jest.fn().mockResolvedValue([]),
+    count: jest.fn().mockResolvedValue(0),
   },
   product: {
     findMany: jest.fn().mockResolvedValue([]),

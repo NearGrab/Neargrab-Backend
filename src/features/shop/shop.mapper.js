@@ -13,6 +13,7 @@ function mapShopDetail(shop, options = {}) {
 
   return {
     id: shop.id,
+    ownerId: shop.ownerId,
     name: shop.name,
     username: shop.username,
     slug: shop.slug,
@@ -51,6 +52,7 @@ function mapShopDetail(shop, options = {}) {
     contact: {
       phone: contact.phone || "",
       whatsapp: contact.whatsapp || null,
+      email: contact.email || null,
       acceptCalls: contact.acceptCalls ?? true,
     },
     timings: shop.timings
@@ -81,6 +83,8 @@ function mapShopDetail(shop, options = {}) {
     stats: {
       productCount: options.productCount || 0,
       reviewCount: options.reviewCount || 0,
+      followersCount: options.followersCount || 0,
+      isFollowing: options.isFollowing || false,
     },
   };
 }

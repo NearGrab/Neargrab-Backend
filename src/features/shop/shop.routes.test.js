@@ -40,6 +40,10 @@ const mockPrisma = {
   shopLead: {
     create: jest.fn(),
   },
+  userFollow: {
+    count: jest.fn().mockResolvedValue(0),
+    findUnique: jest.fn().mockResolvedValue(null),
+  },
   $transaction: jest.fn((callback) => callback(mockPrisma)),
 };
 

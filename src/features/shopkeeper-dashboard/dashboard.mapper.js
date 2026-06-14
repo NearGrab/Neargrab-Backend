@@ -222,10 +222,8 @@ function mapDashboardStats(shop, stats) {
     ],
     performanceData,
     topActions: [
-      { label: "Product Views", value: stats.productViewsTotal.toLocaleString(), growth: formatGrowth(stats.views.growth), isPositive: stats.views.growth >= 0 },
-      { label: "Chat Messages", value: stats.chatsTotal.toLocaleString(), growth: formatGrowth(stats.inquiries.growth), isPositive: stats.inquiries.growth >= 0 },
-      { label: "Calls Received", value: stats.callsTotal.toLocaleString(), growth: formatGrowth(stats.inquiries.growth), isPositive: stats.inquiries.growth >= 0 },
-      { label: "Saved by Users", value: stats.followers.total.toLocaleString(), growth: formatGrowth(stats.followers.growth), isPositive: stats.followers.growth >= 0 },
+      { label: "Product Views", value: stats.productViewsTotal.toLocaleString(), growth: formatGrowth(stats.productViewsGrowth), isPositive: stats.productViewsGrowth >= 0 },
+      { label: "Saved by Users", value: stats.savedProductsTotal.toLocaleString(), growth: formatGrowth(stats.savedProductsGrowth), isPositive: stats.savedProductsGrowth >= 0 },
     ],
     reviews: recentReviewsMapped,
     lowStockProducts: lowStockProductsMapped,

@@ -3,6 +3,14 @@ const { z } = require("zod");
 
 dotenv.config();
 
+// Sync CLOUDINARY_URL and CLOUDINARY_URLS so both can be used
+if (process.env.CLOUDINARY_URL && !process.env.CLOUDINARY_URLS) {
+  process.env.CLOUDINARY_URLS = process.env.CLOUDINARY_URL;
+} else if (process.env.CLOUDINARY_URLS && !process.env.CLOUDINARY_URL) {
+  process.env.CLOUDINARY_URL = process.env.CLOUDINARY_URLS;
+}
+
+
 const envSchema = z
   .object({
     NODE_ENV: z

@@ -1,12 +1,14 @@
 const fs = require("fs").promises;
 const path = require("path");
-const cloudinary = require("cloudinary").v2;
 const env = require("../../config/env");
 const logger = require("../../config/logger");
+const cloudinary = require("cloudinary").v2;
 
 // Configure cloudinary if URL is present
 if (env.CLOUDINARY_URLS) {
-  process.env.CLOUDINARY_URL = env.CLOUDINARY_URLS;
+  cloudinary.config({
+    cloudinary_url: env.CLOUDINARY_URLS,
+  });
 }
 
 /**

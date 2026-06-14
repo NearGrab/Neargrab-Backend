@@ -81,8 +81,7 @@ async function getDashboardStats(userId) {
         status: { not: "DELETED" },
         deletedAt: null,
         OR: [
-          { stockCount: { lte: 10 } },
-          { stockStatus: { in: ["LOW_STOCK", "OUT_OF_STOCK"] } },
+          { stockStatus: "OUT_OF_STOCK" },
           { stockAvailable: false },
         ],
       },
@@ -172,9 +171,22 @@ async function getDashboardStats(userId) {
   });
 
   // Additional aggregates
-  const productViewsTotal = productViews.length;
-  const chatsTotal = leads.filter(l => l.metadata?.action === "chat" || l.metadata?.action === "whatsapp").length;
-  const callsTotal = leads.filter(l => l.metadata?.action === "call").length;
+  const [totalProductViews, totalSavedProducts] = await Promise.all([
+    prisma.productView.count({
+      where: { shopId: shop.id },
+    }),
+    prisma.savedProduct.count({
+      where: { product: { shopId: shop.id } },
+    }),
+  ]);
+
+  const productViewsPeriod1 = viewsTrend14.slice(0, 7).reduce((a, b) => a + b, 0);
+  const productViewsPeriod2 = viewsTrend14.slice(7, 14).reduce((a, b) => a + b, 0);
+  const productViewsGrowth = productViewsPeriod1 === 0 ? (productViewsPeriod2 > 0 ? 100 : 0) : ((productViewsPeriod2 - productViewsPeriod1) / productViewsPeriod1) * 100;
+
+  const savedPeriod1 = followersTrend14.slice(0, 7).reduce((a, b) => a + b, 0);
+  const savedPeriod2 = followersTrend14.slice(7, 14).reduce((a, b) => a + b, 0);
+  const savedProductsGrowth = savedPeriod1 === 0 ? (savedPeriod2 > 0 ? 100 : 0) : ((savedPeriod2 - savedPeriod1) / savedPeriod1) * 100;
 
   return {
     shop,
@@ -184,9 +196,10 @@ async function getDashboardStats(userId) {
       inquiries: inquiriesStats,
       followers: followersStats,
       dates: datesFormatted,
-      productViewsTotal,
-      chatsTotal,
-      callsTotal,
+      productViewsTotal: totalProductViews,
+      productViewsGrowth,
+      savedProductsTotal: totalSavedProducts,
+      savedProductsGrowth,
       lowStockProducts,
       recentReviews,
     },

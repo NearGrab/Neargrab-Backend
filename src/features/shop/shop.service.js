@@ -36,7 +36,7 @@ async function getActiveShop(shopIdOrSlug) {
 /**
  * Returns public shop profile detail.
  */
-async function getPublicShop(shopIdOrSlug) {
+async function getPublicShop(shopIdOrSlug, currentUser = null) {
   const prisma = getPrisma();
 
   const shop = await prisma.shop.findFirst({
@@ -74,16 +74,32 @@ async function getPublicShop(shopIdOrSlug) {
     });
   }
 
-  const [productCount, reviewCount] = await Promise.all([
+  const [productCount, reviewCount, followersCount] = await Promise.all([
     prisma.product.count({
       where: { shopId: shop.id, status: "ACTIVE", deletedAt: null },
     }),
     prisma.review.count({
       where: { shopId: shop.id, status: "PUBLISHED" },
     }),
+    prisma.userFollow.count({
+      where: { followingId: shop.ownerId },
+    }),
   ]);
 
-  return mapShopDetail(shop, { productCount, reviewCount });
+  let isFollowing = false;
+  if (currentUser) {
+    const followRecord = await prisma.userFollow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId: currentUser.id,
+          followingId: shop.ownerId,
+        },
+      },
+    });
+    isFollowing = !!followRecord;
+  }
+
+  return mapShopDetail(shop, { productCount, reviewCount, followersCount, isFollowing });
 }
 
 /**

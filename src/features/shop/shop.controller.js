@@ -3,7 +3,7 @@ const shopService = require("./shop.service");
 
 async function getPublicShop(req, res, next) {
   try {
-    const data = await shopService.getPublicShop(req.params.shopId);
+    const data = await shopService.getPublicShop(req.params.shopId, req.user);
     return sendSuccess(res, data);
   } catch (error) {
     return next(error);
