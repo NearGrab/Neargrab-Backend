@@ -8,6 +8,7 @@ const { AppError } = require("../../lib/errors");
 const mockPrisma = {
   user: {
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
   },
@@ -96,7 +97,7 @@ describe("AuthService", () => {
   describe("login", () => {
     it("should allow login with valid credentials", async () => {
       const passwordHash = await bcrypt.hash(password, 10);
-      mockPrisma.user.findUnique.mockResolvedValue({
+      mockPrisma.user.findFirst.mockResolvedValue({
         id: "user-1",
         email,
         passwordHash,
@@ -117,7 +118,7 @@ describe("AuthService", () => {
 
     it("should reject login with invalid password", async () => {
       const passwordHash = await bcrypt.hash(password, 10);
-      mockPrisma.user.findUnique.mockResolvedValue({
+      mockPrisma.user.findFirst.mockResolvedValue({
         id: "user-1",
         email,
         passwordHash,
@@ -131,7 +132,7 @@ describe("AuthService", () => {
 
     it("should reject suspended or deactivated users", async () => {
       const passwordHash = await bcrypt.hash(password, 10);
-      mockPrisma.user.findUnique.mockResolvedValue({
+      mockPrisma.user.findFirst.mockResolvedValue({
         id: "user-1",
         email,
         passwordHash,

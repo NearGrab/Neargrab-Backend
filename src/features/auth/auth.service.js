@@ -168,8 +168,13 @@ async function login({ email, password, userAgent = null, ipAddress = null }) {
   const prisma = getPrisma();
   const normalizedEmail = normalizeEmail(email);
 
-  const user = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: normalizedEmail },
+        { username: email.trim().toLowerCase() }
+      ]
+    },
     include: { profile: true },
   });
 

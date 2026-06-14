@@ -4,6 +4,7 @@ const https = require("https");
 const env = require("../config/env");
 const { AppError, ERROR_CODES } = require("../lib/errors");
 const { getPrisma } = require("../config/prisma");
+const logger = require("../config/logger");
 
 // Cache for public keys: kid -> KeyObject
 const pubKeyCache = new Map();
@@ -51,7 +52,7 @@ async function getPublicKeyForToken(decoded) {
   if (iss && iss.startsWith("https://") && iss.includes(".supabase.co")) {
     try {
       const jwksUrl = `${iss}/.well-known/jwks.json`;
-      console.log(`verifyToken: Fetching JWKS from issuer: ${jwksUrl}`);
+      logger.info(`verifyToken: Fetching JWKS from issuer: ${jwksUrl}`);
       const jwks = await fetchJwks(jwksUrl);
       if (jwks && Array.isArray(jwks.keys)) {
         for (const key of jwks.keys) {
@@ -68,13 +69,13 @@ async function getPublicKeyForToken(decoded) {
         }
       }
     } catch (err) {
-      console.error("verifyToken: Dynamic JWKS retrieval failed:", err.message);
+      logger.error(`verifyToken: Dynamic JWKS retrieval failed: ${err.message}`);
     }
   }
 
   // Fallback to hardcoded JWK if kid matches
   if (kid === fallbackJwk.kid) {
-    console.log("verifyToken: Using hardcoded fallback JWK for ES256");
+    logger.info("verifyToken: Using hardcoded fallback JWK for ES256");
     try {
       const pubKey = crypto.createPublicKey({
         key: fallbackJwk,
@@ -83,7 +84,7 @@ async function getPublicKeyForToken(decoded) {
       pubKeyCache.set(fallbackJwk.kid, pubKey);
       return pubKey;
     } catch (err) {
-      console.error("verifyToken: Failed to create fallback key:", err.message);
+      logger.error(`verifyToken: Failed to create fallback key: ${err.message}`);
     }
   }
 
@@ -139,26 +140,26 @@ async function verifyToken(req) {
 
   if (alg === "ES256") {
     try {
-      console.log("verifyToken: Attempting ES256 verification using JWKS public key");
+      logger.info("verifyToken: Attempting ES256 verification using JWKS public key");
       const publicKey = await getPublicKeyForToken(decodedWithoutVerification);
       if (!publicKey) {
         throw new Error("No public key matching the token kid could be found");
       }
       decoded = jwt.verify(token, publicKey, { algorithms: ["ES256"] });
-      console.log("verifyToken: Supabase ES256 verification success. Decoded sub:", decoded?.sub, "email:", decoded?.email);
+      logger.info(`verifyToken: Supabase ES256 verification success. Decoded sub: ${decoded?.sub} email: ${decoded?.email}`);
     } catch (err) {
-      console.error("verifyToken: Supabase ES256 verification failed with error:", err.message);
+      logger.error(`verifyToken: Supabase ES256 verification failed with error: ${err.message}`);
     }
   } else {
     // Fallback/legacy HS256 verification
     const supabaseSecret = env.SUPABASE_JWT_SECRET || process.env.SUPABASE_JWT_SECRET;
     if (supabaseSecret) {
       try {
-        console.log("verifyToken: Attempting HS256 verification with configured secret");
+        logger.info("verifyToken: Attempting HS256 verification with configured secret");
         decoded = jwt.verify(token, supabaseSecret, { algorithms: ["HS256"] });
-        console.log("verifyToken: Supabase HS256 verification success. Decoded sub:", decoded?.sub, "email:", decoded?.email);
+        logger.info(`verifyToken: Supabase HS256 verification success. Decoded sub: ${decoded?.sub} email: ${decoded?.email}`);
       } catch (err) {
-        console.error("verifyToken: Supabase HS256 verification failed with error:", err.message);
+        logger.error(`verifyToken: Supabase HS256 verification failed with error: ${err.message}`);
       }
     }
   }
@@ -172,7 +173,7 @@ async function verifyToken(req) {
 
     // Fallback: search by email to map seeded users
     if (!user && decoded.email) {
-      console.log("verifyToken: User not found by ID, searching by email:", decoded.email);
+      logger.info(`verifyToken: User not found by ID, searching by email: ${decoded.email}`);
       user = await prisma.user.findUnique({
         where: { email: decoded.email },
         select: { id: true, role: true, status: true },
@@ -192,7 +193,7 @@ async function verifyToken(req) {
         finalUsername = `${username}_${Math.floor(1000 + Math.random() * 9000)}`;
       }
 
-      console.log("verifyToken: User not found in DB. Creating lazy sync user record:", { email, name, username: finalUsername });
+      logger.info({ email, name, username: finalUsername }, "verifyToken: User not found in DB. Creating lazy sync user record");
       user = await prisma.user.create({
         data: {
           id: decoded.sub,

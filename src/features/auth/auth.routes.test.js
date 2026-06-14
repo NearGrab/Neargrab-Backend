@@ -7,6 +7,7 @@ const env = require("../../config/env");
 const mockPrisma = {
   user: {
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
   },
@@ -96,7 +97,7 @@ describe("Auth Feature Routes", () => {
   describe("POST /api/v1/auth/login", () => {
     it("should authenticate user and return session tokens", async () => {
       const passHash = await bcrypt.hash("Password123!", 10);
-      mockPrisma.user.findUnique.mockResolvedValue({
+      mockPrisma.user.findFirst.mockResolvedValue({
         id: "user-123",
         name: "Arion",
         email: "arion@example.com",
@@ -129,7 +130,7 @@ describe("Auth Feature Routes", () => {
 
     it("should return 400 on incorrect password", async () => {
       const passHash = await bcrypt.hash("Password123!", 10);
-      mockPrisma.user.findUnique.mockResolvedValue({
+      mockPrisma.user.findFirst.mockResolvedValue({
         id: "user-123",
         name: "Arion",
         email: "arion@example.com",

@@ -38,7 +38,7 @@ const signupBody = z
   });
 
 const loginBody = z.object({
-  email: z.string().trim().email("Invalid email format").toLowerCase(),
+  email: z.string().trim().min(1, "Username or Email is required").toLowerCase(),
   password: z.string().min(1, "Password is required"),
 });
 
