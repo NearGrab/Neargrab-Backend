@@ -17,6 +17,9 @@ const mockPrisma = {
   product: {
     findMany: jest.fn(),
   },
+  review: {
+    findMany: jest.fn(),
+  },
 };
 
 jest.mock("../../config/prisma", () => ({
@@ -73,6 +76,7 @@ describe("Explore Feature Routes", () => {
       mockPrisma.banner.findMany.mockResolvedValue([]);
       mockPrisma.shop.findMany.mockResolvedValue([]);
       mockPrisma.product.findMany.mockResolvedValue([]);
+      mockPrisma.review.findMany.mockResolvedValue([]);
 
       const res = await request(app)
         .get("/api/v1/explore")

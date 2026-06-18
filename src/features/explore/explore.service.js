@@ -93,6 +93,19 @@ async function listBrands({ includeCounts, q, status }) {
   return brands.map((b) => mapBrand(b, { includeCounts }));
 }
 
+function formatDateRelative(date) {
+  const diffMs = Date.now() - new Date(date).getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return "Yesterday";
+  return `${diffDays} days ago`;
+}
+
 /**
  * Get explore feed summary payload.
  */
@@ -192,6 +205,68 @@ async function getExploreFeed(params) {
     }),
   ]);
 
+  // 6. Fetch 5 latest reviews with rating >= 4
+  let latestReviews = await prisma.review.findMany({
+    where: {
+      status: "PUBLISHED",
+      deletedAt: null,
+      rating: { gte: 4 },
+      shop: {
+        city: { equals: activeCity, mode: "insensitive" },
+        status: "ACTIVE",
+        deletedAt: null,
+      }
+    },
+    include: {
+      user: {
+        include: { avatar: true }
+      },
+      shop: true,
+    },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
+
+  if (latestReviews.length < 5) {
+    const additionalReviews = await prisma.review.findMany({
+      where: {
+        status: "PUBLISHED",
+        deletedAt: null,
+        rating: { gte: 4 },
+        id: { notIn: latestReviews.map((r) => r.id) }
+      },
+      include: {
+        user: {
+          include: { avatar: true }
+        },
+        shop: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 5 - latestReviews.length,
+    });
+    latestReviews = [...latestReviews, ...additionalReviews];
+  }
+
+  const uniqueReviews = [];
+  const seenIds = new Set();
+  for (const r of latestReviews) {
+    if (!seenIds.has(r.id)) {
+      seenIds.add(r.id);
+      uniqueReviews.push(r);
+    }
+  }
+
+  const realReviews = uniqueReviews.map((r) => ({
+    id: r.id,
+    user: r.user?.name || "Anonymous",
+    avatar: r.user?.avatar?.url || null,
+    time: formatDateRelative(r.createdAt),
+    rating: r.rating,
+    comment: r.comment,
+    storeName: r.shop?.name || "Local Store",
+    shopId: r.shopId,
+  }));
+
   const nearbyShops = shops.slice(0, 10);
 
   const mapProduct = (prod) => mapProductCard(prod);
@@ -203,6 +278,7 @@ async function getExploreFeed(params) {
     topProducts: topProductsData.map(mapProduct),
     pinnedProducts: pinnedProductsData.map(mapProduct),
     banners: banners.map((b) => mapBanner(b)),
+    realReviews,
     sections: {
       topPicks: topProductsData.map(mapProduct),
       newArrivals: newArrivalsData.map(mapProduct),

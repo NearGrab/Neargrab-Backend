@@ -17,6 +17,9 @@ const mockPrisma = {
   product: {
     findMany: jest.fn(),
   },
+  review: {
+    findMany: jest.fn(),
+  },
 };
 
 jest.mock("../../config/prisma", () => ({
@@ -141,6 +144,16 @@ describe("ExploreService", () => {
           },
         },
       ]);
+      mockPrisma.review.findMany.mockResolvedValue([
+        {
+          id: "rev-1",
+          rating: 5,
+          comment: "Excellent quality!",
+          createdAt: new Date(),
+          user: { name: "John Doe", avatar: { url: "avatar.jpg" } },
+          shop: { id: "shop-1", name: "Daily Mart" },
+        }
+      ]);
 
       const feed = await exploreService.getExploreFeed({
         city: "Navsari",
@@ -155,6 +168,9 @@ describe("ExploreService", () => {
       expect(feed.banners).toHaveLength(1);
       expect(feed.nearbyShops).toHaveLength(1);
       expect(feed.pinnedProducts).toHaveLength(1);
+      expect(feed.realReviews).toHaveLength(1);
+      expect(feed.realReviews[0].user).toBe("John Doe");
+      expect(feed.realReviews[0].rating).toBe(5);
     });
   });
 
