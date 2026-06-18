@@ -37,6 +37,9 @@ const mockPrisma = {
     findMany: jest.fn().mockResolvedValue([]),
     count: jest.fn().mockResolvedValue(0),
   },
+  userFollow: {
+    count: jest.fn().mockResolvedValue(0),
+  },
   savedProduct: {
     findMany: jest.fn().mockResolvedValue([]),
     count: jest.fn().mockResolvedValue(0),

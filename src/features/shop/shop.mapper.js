@@ -26,6 +26,8 @@ function mapShopDetail(shop, options = {}) {
     leadCount: shop.leadCount || 0,
     googleMapsUrl: shop.googleMapsUrl || null,
     city: shop.city || address.city || null,
+    establishedYear: shop.establishedYear || null,
+    createdAt: shop.createdAt ? shop.createdAt.toISOString() : null,
     category: mapCategory(shop.category),
     logo: shop.logo
       ? {
@@ -86,6 +88,7 @@ function mapShopDetail(shop, options = {}) {
       productCount: options.productCount || 0,
       reviewCount: options.reviewCount || 0,
       followersCount: options.followersCount || 0,
+      followingCount: options.followingCount || 0,
       isFollowing: options.isFollowing || false,
     },
   };

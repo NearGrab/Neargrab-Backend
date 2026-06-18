@@ -39,7 +39,7 @@ async function getActiveShop(shopIdOrSlug) {
 async function getPublicShop(shopIdOrSlug, currentUser = null) {
   const prisma = getPrisma();
 
-  const shop = await prisma.shop.findFirst({
+  let shop = await prisma.shop.findFirst({
     where: {
       OR: [
         { id: shopIdOrSlug },
@@ -47,6 +47,22 @@ async function getPublicShop(shopIdOrSlug, currentUser = null) {
       ],
       status: "ACTIVE",
       deletedAt: null,
+    },
+  });
+
+  if (!shop) {
+    throw new AppError({
+      statusCode: 404,
+      code: ERROR_CODES.SHOP_NOT_FOUND,
+      message: "Shop not found or inactive",
+    });
+  }
+
+  // Increment viewCount and retrieve with full relations
+  shop = await prisma.shop.update({
+    where: { id: shop.id },
+    data: {
+      viewCount: { increment: 1 },
     },
     include: {
       category: true,
@@ -66,15 +82,7 @@ async function getPublicShop(shopIdOrSlug, currentUser = null) {
     },
   });
 
-  if (!shop) {
-    throw new AppError({
-      statusCode: 404,
-      code: ERROR_CODES.SHOP_NOT_FOUND,
-      message: "Shop not found or inactive",
-    });
-  }
-
-  const [productCount, reviewCount, followersCount] = await Promise.all([
+  const [productCount, reviewCount, followersCount, followingCount] = await Promise.all([
     prisma.product.count({
       where: { shopId: shop.id, status: "ACTIVE", deletedAt: null },
     }),
@@ -83,6 +91,9 @@ async function getPublicShop(shopIdOrSlug, currentUser = null) {
     }),
     prisma.userFollow.count({
       where: { followingId: shop.ownerId },
+    }),
+    prisma.userFollow.count({
+      where: { followerId: shop.ownerId },
     }),
   ]);
 
@@ -99,7 +110,7 @@ async function getPublicShop(shopIdOrSlug, currentUser = null) {
     isFollowing = !!followRecord;
   }
 
-  return mapShopDetail(shop, { productCount, reviewCount, followersCount, isFollowing });
+  return mapShopDetail(shop, { productCount, reviewCount, followersCount, followingCount, isFollowing });
 }
 
 /**

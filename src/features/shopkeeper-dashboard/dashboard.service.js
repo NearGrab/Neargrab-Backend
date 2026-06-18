@@ -245,11 +245,42 @@ async function getDashboardStats(userId) {
   };
 }
 
-/**
- * Retrieve own shop profile detail.
- */
 async function getShopProfile(userId) {
-  return await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShop(userId);
+  const prisma = getPrisma();
+
+  const [productCount, reviewCount, followersCount, followingCount, leads] = await Promise.all([
+    prisma.product.count({
+      where: { shopId: shop.id, status: "ACTIVE", deletedAt: null },
+    }),
+    prisma.review.count({
+      where: { shopId: shop.id, status: "PUBLISHED" },
+    }),
+    prisma.userFollow.count({
+      where: { followingId: shop.ownerId },
+    }),
+    prisma.userFollow.count({
+      where: { followerId: shop.ownerId },
+    }),
+    prisma.shopLead.findMany({
+      where: { shopId: shop.id },
+      select: { metadata: true }
+    }),
+  ]);
+
+  const directionClicks = leads.filter(l => l.metadata?.action === 'MAP_OPEN').length;
+
+  return {
+    ...shop,
+    stats: {
+      productCount,
+      reviewCount,
+      followersCount,
+      followingCount,
+      directionClicks,
+      viewCount: shop.viewCount || 0,
+    },
+  };
 }
 
 /**
@@ -427,7 +458,7 @@ async function updateShopProfile(userId, input) {
     }
 
     // Retrieve updated shop profile
-    return await tx.shop.findUnique({
+    const updatedShop = await tx.shop.findUnique({
       where: { id: shop.id },
       include: {
         address: true,
@@ -440,6 +471,39 @@ async function updateShopProfile(userId, input) {
         tags: true,
       },
     });
+
+    const [productCount, reviewCount, followersCount, followingCount, leads] = await Promise.all([
+      tx.product.count({
+        where: { shopId: shop.id, status: "ACTIVE", deletedAt: null },
+      }),
+      tx.review.count({
+        where: { shopId: shop.id, status: "PUBLISHED" },
+      }),
+      tx.userFollow.count({
+        where: { followingId: shop.ownerId },
+      }),
+      tx.userFollow.count({
+        where: { followerId: shop.ownerId },
+      }),
+      tx.shopLead.findMany({
+        where: { shopId: shop.id },
+        select: { metadata: true }
+      }),
+    ]);
+
+    const directionClicks = leads.filter(l => l.metadata?.action === 'MAP_OPEN').length;
+
+    return {
+      ...updatedShop,
+      stats: {
+        productCount,
+        reviewCount,
+        followersCount,
+        followingCount,
+        directionClicks,
+        viewCount: updatedShop.viewCount || 0,
+      },
+    };
   });
 }
 

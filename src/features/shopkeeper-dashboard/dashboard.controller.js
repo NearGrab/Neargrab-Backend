@@ -22,7 +22,7 @@ async function getDashboardStats(req, res, next) {
 async function getShopProfile(req, res, next) {
   try {
     const shop = await dashboardService.getShopProfile(req.user.id);
-    const data = mapShopDetail(shop);
+    const data = mapShopDetail(shop, shop.stats);
     sendSuccess(res, data);
   } catch (err) {
     next(err);
@@ -32,7 +32,7 @@ async function getShopProfile(req, res, next) {
 async function updateShopProfile(req, res, next) {
   try {
     const updated = await dashboardService.updateShopProfile(req.user.id, req.body);
-    const data = mapShopDetail(updated);
+    const data = mapShopDetail(updated, updated.stats);
     sendSuccess(res, data);
   } catch (err) {
     next(err);
