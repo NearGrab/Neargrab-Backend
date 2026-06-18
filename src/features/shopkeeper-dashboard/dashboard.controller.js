@@ -229,6 +229,44 @@ async function bulkUpdateShopProducts(req, res, next) {
   }
 }
 
+async function listPromotionRequests(req, res, next) {
+  try {
+    const banners = await dashboardService.listPromotionRequests(req.user.id);
+    const data = banners.map((b) => ({
+      id: b.id,
+      description: b.title,
+      status: b.status,
+      imageUrl: b.image?.url || "",
+      mediaId: b.imageId,
+      startAt: b.startAt,
+      endAt: b.endAt,
+      createdAt: b.createdAt,
+    }));
+    sendSuccess(res, data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function createPromotionRequest(req, res, next) {
+  try {
+    const banner = await dashboardService.createPromotionRequest(req.user.id, req.body);
+    const data = {
+      id: banner.id,
+      description: banner.title,
+      status: banner.status,
+      imageUrl: banner.image?.url || "",
+      mediaId: banner.imageId,
+      startAt: banner.startAt,
+      endAt: banner.endAt,
+      createdAt: banner.createdAt,
+    };
+    sendSuccess(res, data);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getDashboardStats,
   getShopProfile,
@@ -248,4 +286,6 @@ module.exports = {
   attachProductImage,
   detachProductImage,
   bulkUpdateShopProducts,
+  listPromotionRequests,
+  createPromotionRequest,
 };

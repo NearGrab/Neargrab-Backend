@@ -13,7 +13,7 @@ const listUsersQuery = z.object({
   status: z.string().optional(),
   city: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(10),
+  limit: z.coerce.number().int().min(1).max(1000).default(10),
 });
 
 const updateUserBody = z.object({
@@ -28,7 +28,7 @@ const listShopsQuery = z.object({
   verificationStatus: z.string().optional(),
   city: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(10),
+  limit: z.coerce.number().int().min(1).max(1000).default(10),
 });
 
 const verifyShopBody = z.object({
@@ -50,7 +50,7 @@ const listProductsQuery = z.object({
     return undefined;
   }, z.boolean().optional()),
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(10),
+  limit: z.coerce.number().int().min(1).max(1000).default(10),
 });
 
 const updateProductBody = z.object({
@@ -72,7 +72,7 @@ const listBannersQuery = z.object({
   status: z.string().optional(),
   device: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(10),
+  limit: z.coerce.number().int().min(1).max(1000).default(10),
 });
 
 const createBannerBody = z.object({
@@ -104,7 +104,7 @@ const updateContentBody = z.object({
 const listReviewsQuery = z.object({
   status: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(10),
+  limit: z.coerce.number().int().min(1).max(1000).default(10),
 });
 
 const updateReviewBody = z.object({
@@ -115,7 +115,7 @@ const listFeedbackQuery = z.object({
   type: z.string().optional(),
   status: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(10),
+  limit: z.coerce.number().int().min(1).max(1000).default(10),
 });
 
 const updateFeedbackBody = z.object({
@@ -125,7 +125,7 @@ const updateFeedbackBody = z.object({
 // Audit Logs
 const listAuditLogsQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(10),
+  limit: z.coerce.number().int().min(1).max(1000).default(10),
 });
 
 module.exports = {

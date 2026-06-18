@@ -78,6 +78,10 @@ const mockPrisma = {
     delete: jest.fn(),
     create: jest.fn(),
   },
+  banner: {
+    findMany: jest.fn(),
+    create: jest.fn(),
+  },
   $transaction: jest.fn((callback) => callback(mockPrisma)),
 };
 
@@ -281,6 +285,62 @@ describe("DashboardService", () => {
       });
 
       expect(mockPrisma.product.updateMany).toHaveBeenCalled();
+    });
+  });
+
+  describe("Promotions Actions", () => {
+    const mockBanner = {
+      id: "banner-111",
+      title: "Weekend Sale 20% Off",
+      shopId: "shop-111",
+      city: "Navsari",
+      section: "TOP_CAROUSEL",
+      status: "DRAFT",
+      devices: ["MOBILE", "DESKTOP"],
+      plan: "PROMOTION",
+      imageId: "media-111",
+      startAt: new Date(),
+      endAt: new Date(),
+    };
+
+    it("should successfully create a promotion request", async () => {
+      mockPrisma.shop.findUnique.mockResolvedValue(mockShop);
+      mockPrisma.mediaAsset.findUnique.mockResolvedValue({
+        id: "media-111",
+        ownerId: dummyUserId,
+      });
+      mockPrisma.banner.create.mockResolvedValue(mockBanner);
+
+      const result = await dashboardService.createPromotionRequest(dummyUserId, {
+        description: "Weekend Sale 20% Off",
+        mediaId: "media-111",
+      });
+
+      expect(result.id).toBe("banner-111");
+      expect(mockPrisma.banner.create).toHaveBeenCalled();
+    });
+
+    it("should throw error if media asset does not exist", async () => {
+      mockPrisma.shop.findUnique.mockResolvedValue(mockShop);
+      mockPrisma.mediaAsset.findUnique.mockResolvedValue(null);
+
+      await expect(
+        dashboardService.createPromotionRequest(dummyUserId, {
+          description: "Weekend Sale 20% Off",
+          mediaId: "media-invalid",
+        })
+      ).rejects.toThrow(AppError);
+    });
+
+    it("should successfully list promotion requests", async () => {
+      mockPrisma.shop.findUnique.mockResolvedValue(mockShop);
+      mockPrisma.banner.findMany.mockResolvedValue([mockBanner]);
+
+      const result = await dashboardService.listPromotionRequests(dummyUserId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe("Weekend Sale 20% Off");
+      expect(mockPrisma.banner.findMany).toHaveBeenCalled();
     });
   });
 });

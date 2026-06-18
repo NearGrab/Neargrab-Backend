@@ -143,6 +143,8 @@ async function getDashboardSummary() {
 
   // Totals & Trends counts
   const [
+    totalUsersCount,
+    totalProductsCount,
     totalShopsCount,
     totalReviewsCount,
     totalLeadsCount,
@@ -159,6 +161,8 @@ async function getDashboardSummary() {
     productsLast7,
     productsPrev7,
   ] = await Promise.all([
+    prisma.user.count({ where: { deletedAt: null, role: { notIn: ["ADMIN", "SUPER_ADMIN", "SUPPORT_ADMIN", "CONTENT_ADMIN"] } } }),
+    prisma.product.count({ where: { deletedAt: null } }),
     prisma.shop.count({ where: { deletedAt: null } }),
     prisma.review.count({ where: { deletedAt: null } }),
     prisma.shopLead.count(),
@@ -308,6 +312,10 @@ async function getDashboardSummary() {
       flaggedContent,
     },
     totals: {
+      totalUsers: totalUsersCount,
+      totalUsersTrend: newUsersTrend,
+      totalProducts: totalProductsCount,
+      totalProductsTrend: productsAddedTrend,
       totalShops: totalShopsCount,
       totalShopsTrend,
       totalReviews: totalReviewsCount,
@@ -346,11 +354,11 @@ async function listUsers(filters) {
   }
 
   if (role && role !== "all") {
-    where.role = role;
+    where.role = role.toUpperCase();
   }
 
   if (status && status !== "all") {
-    where.status = status;
+    where.status = status.toUpperCase();
   }
 
   if (city && city !== "all") {
@@ -512,11 +520,11 @@ async function listShops(filters) {
   }
 
   if (status && status !== "all") {
-    where.status = status;
+    where.status = status.toUpperCase();
   }
 
   if (verificationStatus && verificationStatus !== "all") {
-    where.verificationStatus = verificationStatus;
+    where.verificationStatus = verificationStatus.toUpperCase();
   }
 
   if (city && city !== "all") {
@@ -669,11 +677,11 @@ async function listProducts(filters) {
   }
 
   if (status && status !== "all") {
-    where.status = status;
+    where.status = status.toUpperCase();
   }
 
   if (stockStatus && stockStatus !== "all") {
-    where.stockStatus = stockStatus;
+    where.stockStatus = stockStatus.toUpperCase();
   }
 
   if (city && city !== "all") {
@@ -948,15 +956,15 @@ async function listBanners(filters) {
   }
 
   if (section && section !== "all") {
-    where.section = section;
+    where.section = section.toUpperCase();
   }
 
   if (status && status !== "all") {
-    where.status = status;
+    where.status = status.toUpperCase();
   }
 
   if (device && device !== "all") {
-    where.devices = { has: device };
+    where.devices = { has: device.toUpperCase() };
   }
 
   const [total, banners] = await Promise.all([

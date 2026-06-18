@@ -81,6 +81,10 @@ const mockPrisma = {
     delete: jest.fn(),
     findFirst: jest.fn(),
   },
+  banner: {
+    findMany: jest.fn(),
+    create: jest.fn(),
+  },
   $transaction: jest.fn((callback) => callback(mockPrisma)),
 };
 
@@ -277,6 +281,70 @@ describe("Shopkeeper Dashboard & Catalog Feature Routes", () => {
         .expect(200);
 
       expect(res.body.success).toBe(true);
+    });
+  });
+
+  describe("Promotions Routes", () => {
+    const mockBanner = {
+      id: "banner-123",
+      title: "Super Weekend Sale",
+      shopId: "shop-123",
+      city: "Navsari",
+      section: "TOP_CAROUSEL",
+      status: "DRAFT",
+      devices: ["MOBILE", "DESKTOP"],
+      plan: "PROMOTION",
+      imageId: "media-123",
+      startAt: new Date(),
+      endAt: new Date(),
+      image: {
+        id: "media-123",
+        url: "https://example.com/banner.jpg",
+      },
+    };
+
+    it("should list promotion requests", async () => {
+      mockPrisma.banner.findMany.mockResolvedValue([mockBanner]);
+
+      const res = await request(app)
+        .get("/api/v1/shopkeeper/promotions")
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0].description).toBe("Super Weekend Sale");
+    });
+
+    it("should submit a new promotion request", async () => {
+      mockPrisma.mediaAsset.findUnique.mockResolvedValue({
+        id: "media-123",
+        ownerId: userId,
+      });
+      mockPrisma.banner.create.mockResolvedValue(mockBanner);
+
+      const res = await request(app)
+        .post("/api/v1/shopkeeper/promotions")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          description: "Super Weekend Sale",
+          mediaId: "media-123",
+        })
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.description).toBe("Super Weekend Sale");
+    });
+
+    it("should fail validation if description is too short", async () => {
+      await request(app)
+        .post("/api/v1/shopkeeper/promotions")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          description: "Sale",
+          mediaId: "media-123",
+        })
+        .expect(400);
     });
   });
 });

@@ -1238,6 +1238,82 @@ async function bulkUpdateShopProducts(userId, input) {
   });
 }
 
+/**
+ * Create a new promotion request (Banner in DRAFT status)
+ */
+async function createPromotionRequest(userId, input) {
+  const prisma = getPrisma();
+  const shop = await getShopkeeperShop(userId);
+
+  const { description, mediaId } = input;
+
+  // Verify that the media asset exists and belongs to the user (optional check)
+  const mediaAsset = await prisma.mediaAsset.findUnique({
+    where: { id: mediaId },
+  });
+
+  if (!mediaAsset) {
+    throw new AppError({
+      statusCode: 404,
+      code: ERROR_CODES.MEDIA_NOT_FOUND,
+      message: "Media asset not found",
+    });
+  }
+
+  if (mediaAsset.ownerId && mediaAsset.ownerId !== userId) {
+    throw new AppError({
+      statusCode: 403,
+      code: ERROR_CODES.MEDIA_FORBIDDEN,
+      message: "You do not own this media asset",
+    });
+  }
+
+  // Create the banner as a DRAFT promotion request
+  const banner = await prisma.banner.create({
+    data: {
+      title: description,
+      shopId: shop.id,
+      city: shop.address?.city || null,
+      section: "TOP_CAROUSEL",
+      status: "DRAFT",
+      devices: ["MOBILE", "DESKTOP"],
+      plan: "PROMOTION",
+      imageId: mediaId,
+      startAt: new Date(),
+      endAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default to 30 days
+    },
+    include: {
+      image: true,
+      shop: true,
+    },
+  });
+
+  return banner;
+}
+
+/**
+ * List all promotion requests (banners) for this shopkeeper
+ */
+async function listPromotionRequests(userId) {
+  const shop = await getShopkeeperShop(userId);
+  const prisma = getPrisma();
+
+  const banners = await prisma.banner.findMany({
+    where: {
+      shopId: shop.id,
+      deletedAt: null,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    include: {
+      image: true,
+    },
+  });
+
+  return banners;
+}
+
 module.exports = {
   getShopkeeperShop,
   getDashboardStats,
@@ -1258,4 +1334,6 @@ module.exports = {
   attachProductImage,
   detachProductImage,
   bulkUpdateShopProducts,
+  createPromotionRequest,
+  listPromotionRequests,
 };

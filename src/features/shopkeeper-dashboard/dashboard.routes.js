@@ -79,4 +79,12 @@ router.delete(
   controller.detachProductImage
 );
 
+// Promotions / Banner Requests
+router.get("/promotions", controller.listPromotionRequests);
+router.post(
+  "/promotions",
+  validate({ body: schema.createPromotionRequestBody }),
+  controller.createPromotionRequest
+);
+
 module.exports = router;

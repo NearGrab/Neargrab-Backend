@@ -129,6 +129,11 @@ const listLeadsQuery = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+const createPromotionRequestBody = z.object({
+  description: z.string().trim().min(5, "Description must be at least 5 characters"),
+  mediaId: z.string().min(1, "mediaId is required"),
+});
+
 module.exports = {
   productIdParam,
   imageIdParam,
@@ -145,4 +150,5 @@ module.exports = {
   listReservationsQuery,
   listReviewsQuery,
   listLeadsQuery,
+  createPromotionRequestBody,
 };
