@@ -117,19 +117,14 @@ async function getAvailableStores(productIdOrSlug, filters) {
   }
 
   const { city, latitude, longitude, radiusKm, page, limit } = filters;
-  const hasLocation = latitude !== undefined && longitude !== undefined;
+  const hasLocation = false; // Bypass GPS coordinates in MVP
 
   const shopWhere = {
     status: "ACTIVE",
     deletedAt: null,
     id: { not: refProduct.shopId }, // Exclude current shop
+    city: { equals: city || "Surat", mode: "insensitive" },
   };
-
-  if (city) {
-    shopWhere.address = {
-      city: { equals: city, mode: "insensitive" },
-    };
-  }
 
   if (hasLocation && radiusKm) {
     const latDelta = radiusKm / 111;
@@ -274,7 +269,7 @@ async function getSimilarProducts(productIdOrSlug, filters) {
     shop: {
       status: "ACTIVE",
       deletedAt: null,
-      ...(city ? { address: { city: { equals: city, mode: "insensitive" } } } : {}),
+      city: { equals: city || "Surat", mode: "insensitive" },
     },
     OR: [
       ...(refProduct.brandId ? [{ brandId: refProduct.brandId }] : []),
@@ -761,6 +756,77 @@ async function createProductFeedback(productIdOrSlug, input, user) {
   return { id: feedback.id };
 }
 
+// In-memory click deduplication cache: key -> timestamp
+const clickCache = new Map();
+const CLICK_DEDUPLICATION_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+// Clean up cache periodically (every 1 hour)
+const cleanupInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamp] of clickCache.entries()) {
+    if (now - timestamp > CLICK_DEDUPLICATION_WINDOW_MS) {
+      clickCache.delete(key);
+    }
+  }
+}, 60 * 60 * 1000);
+if (cleanupInterval && typeof cleanupInterval.unref === 'function') {
+  cleanupInterval.unref();
+}
+
+/**
+ * Tracks a product click event with a 1-hour deduplication window per user/IP.
+ */
+async function trackProductClick(productIdOrSlug, ipAddress, userId) {
+  const prisma = getPrisma();
+
+  const product = await prisma.product.findFirst({
+    where: {
+      OR: [
+        { id: productIdOrSlug },
+        { slug: productIdOrSlug },
+      ],
+      status: "ACTIVE",
+      deletedAt: null,
+      shop: {
+        status: "ACTIVE",
+        deletedAt: null,
+      },
+    },
+  });
+
+  if (!product) {
+    throw new AppError({
+      statusCode: 404,
+      code: ERROR_CODES.PRODUCT_NOT_FOUND,
+      message: "Product not found or inactive",
+    });
+  }
+
+  const userKey = userId || ipAddress || "anonymous";
+  const cacheKey = `${userKey}:${product.id}`;
+  const now = Date.now();
+  const lastClick = clickCache.get(cacheKey);
+
+  if (lastClick && now - lastClick < CLICK_DEDUPLICATION_WINDOW_MS) {
+    return { success: true, duplicated: true };
+  }
+
+  clickCache.set(cacheKey, now);
+
+  await prisma.productAnalytics.upsert({
+    where: { productId: product.id },
+    create: {
+      productId: product.id,
+      totalClicks: 1,
+    },
+    update: {
+      totalClicks: { increment: 1 },
+    },
+  });
+
+  return { success: true, duplicated: false };
+}
+
 module.exports = {
   getProductDetail,
   getAvailableStores,
@@ -771,4 +837,5 @@ module.exports = {
   unsaveProduct,
   trackProductView,
   createProductFeedback,
+  trackProductClick,
 };

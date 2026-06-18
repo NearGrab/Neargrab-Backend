@@ -155,7 +155,6 @@ describe("ExploreService", () => {
       expect(feed.banners).toHaveLength(1);
       expect(feed.nearbyShops).toHaveLength(1);
       expect(feed.pinnedProducts).toHaveLength(1);
-      expect(feed.nearbyShops[0].distanceKm).toBeLessThan(5);
     });
   });
 

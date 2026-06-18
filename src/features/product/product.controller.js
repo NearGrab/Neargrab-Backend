@@ -112,6 +112,19 @@ async function createProductFeedback(req, res, next) {
   }
 }
 
+async function trackProductClick(req, res, next) {
+  try {
+    const data = await productService.trackProductClick(
+      req.params.productId,
+      req.ip,
+      req.user?.id
+    );
+    return sendSuccess(res, data);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   getProductDetail,
   getAvailableStores,
@@ -122,4 +135,5 @@ module.exports = {
   unsaveProduct,
   trackProductView,
   createProductFeedback,
+  trackProductClick,
 };

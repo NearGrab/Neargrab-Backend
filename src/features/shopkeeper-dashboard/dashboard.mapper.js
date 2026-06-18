@@ -44,6 +44,8 @@ function mapDashboardProduct(product) {
     ratingAvg: toNum(product.ratingAvg) || 0,
     reviewCount: product.reviewCount || 0,
     viewCount: product.viewCount || 0,
+    views: product.viewCount || 0,
+    clicks: product.analytics?.totalClicks || 0,
     images: product.images
       ? product.images.map((img) => ({
           id: img.id,
@@ -223,6 +225,7 @@ function mapDashboardStats(shop, stats) {
     performanceData,
     topActions: [
       { label: "Product Views", value: stats.productViewsTotal.toLocaleString(), growth: formatGrowth(stats.productViewsGrowth), isPositive: stats.productViewsGrowth >= 0 },
+      { label: "Product Clicks", value: stats.productClicksTotal.toLocaleString(), growth: formatGrowth(stats.productClicksGrowth), isPositive: stats.productClicksGrowth >= 0 },
       { label: "Saved by Users", value: stats.savedProductsTotal.toLocaleString(), growth: formatGrowth(stats.savedProductsGrowth), isPositive: stats.savedProductsGrowth >= 0 },
     ],
     reviews: recentReviewsMapped,

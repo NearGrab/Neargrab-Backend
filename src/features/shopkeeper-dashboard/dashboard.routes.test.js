@@ -50,6 +50,11 @@ const mockPrisma = {
     findMany: jest.fn().mockResolvedValue([]),
     count: jest.fn().mockResolvedValue(0),
   },
+  productAnalytics: {
+    aggregate: jest.fn().mockResolvedValue({ _sum: { totalClicks: 0 } }),
+    create: jest.fn(),
+    upsert: jest.fn(),
+  },
   product: {
     findMany: jest.fn().mockResolvedValue([]),
     count: jest.fn().mockResolvedValue(0),

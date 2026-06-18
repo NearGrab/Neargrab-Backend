@@ -334,8 +334,19 @@ async function updateAddress(userId, data) {
   assertNotLocked(shop);
 
   const radiusKm = data.serviceRadiusKm || parseRadiusKm(data.radius);
+  const lat = data.coordinates?.lat ?? 0;
+  const lng = data.coordinates?.lng ?? 0;
 
   await runInTransaction(async (tx) => {
+    // Save city and googleMapsUrl to the main Shop model
+    await tx.shop.update({
+      where: { id: shop.id },
+      data: {
+        city: data.city || "Surat",
+        googleMapsUrl: data.googleMapsUrl || null,
+      },
+    });
+
     await tx.shopAddress.upsert({
       where: { shopId: shop.id },
       update: {
@@ -344,8 +355,8 @@ async function updateAddress(userId, data) {
         city: data.city,
         state: data.state,
         pincode: data.pincode,
-        latitude: data.coordinates.lat,
-        longitude: data.coordinates.lng,
+        latitude: lat,
+        longitude: lng,
         serviceRadiusKm: radiusKm,
       },
       create: {
@@ -355,8 +366,8 @@ async function updateAddress(userId, data) {
         city: data.city,
         state: data.state,
         pincode: data.pincode,
-        latitude: data.coordinates.lat,
-        longitude: data.coordinates.lng,
+        latitude: lat,
+        longitude: lng,
         serviceRadiusKm: radiusKm,
       },
     });

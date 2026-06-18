@@ -157,6 +157,7 @@ model User {
   city            String?
   state           String?
   pincode         String?
+  preferredCity   String?
   emailVerifiedAt DateTime?
   phoneVerifiedAt DateTime?
   lastLoginAt     DateTime?
@@ -286,6 +287,8 @@ model Shop {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   deletedAt          DateTime?
+  googleMapsUrl      String?
+  city               String             @default("Surat")
 
   owner          User                @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   category       Category?           @relation(fields: [categoryId], references: [id])
@@ -496,6 +499,7 @@ model Product {
   updatedAt      DateTime      @updatedAt
   deletedAt      DateTime?
 
+  analytics        ProductAnalytics?
   shop             Shop              @relation(fields: [shopId], references: [id], onDelete: Cascade)
   category         Category?         @relation(fields: [categoryId], references: [id])
   brand            Brand?            @relation(fields: [brandId], references: [id])
@@ -915,4 +919,14 @@ model MediaAsset {
   reviewMedia        ReviewMedia[]
 
   @@index([ownerId])
+}
+
+model ProductAnalytics {
+  id            String   @id @default(cuid())
+  productId     String   @unique
+  totalClicks   Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 }

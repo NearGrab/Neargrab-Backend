@@ -34,16 +34,22 @@ const updateProfileBody = z.object({
   logoMediaId: z.string().trim().optional().nullable(),
   coverMediaId: z.string().trim().optional().nullable(),
   categoryId: z.string().optional().nullable(),
-  address: z.object({
-    street: z.string().trim().min(1).optional(),
-    landmark: z.string().trim().optional().nullable(),
-    city: z.string().trim().min(1).optional(),
-    state: z.string().trim().min(1).optional(),
-    pincode: z.string().trim().length(6).regex(/^\d+$/).optional(),
-    latitude: z.number().min(-90).max(90).optional(),
-    longitude: z.number().min(-180).max(180).optional(),
-    serviceRadiusKm: z.number().min(0.5).max(25).optional(),
-  }).optional(),
+  googleMapsUrl: z.string().trim().regex(/^https:\/\/(www\.)?(google\.[a-z]+(\.[a-z]+)?\/maps|maps\.app\.goo\.gl)\/.*$/, "Must be a valid Google Maps URL").optional().nullable(),
+  city: z.string().trim().min(1).optional().nullable(),
+  landmark: z.string().trim().optional().nullable(),
+  address: z.union([
+    z.string().trim(),
+    z.object({
+      street: z.string().trim().min(1).optional(),
+      landmark: z.string().trim().optional().nullable(),
+      city: z.string().trim().min(1).optional(),
+      state: z.string().trim().min(1).optional(),
+      pincode: z.string().trim().length(6).regex(/^\d+$/).optional(),
+      latitude: z.number().min(-90).max(90).optional(),
+      longitude: z.number().min(-180).max(180).optional(),
+      serviceRadiusKm: z.number().min(0.5).max(25).optional(),
+    })
+  ]).optional(),
   contact: z.object({
     phone: z.string().trim().length(10).regex(/^\d+$/).optional(),
     whatsapp: z.string().trim().length(10).regex(/^\d+$/).optional().nullable(),

@@ -41,6 +41,11 @@ const mockPrisma = {
     findMany: jest.fn().mockResolvedValue([]),
     count: jest.fn().mockResolvedValue(0),
   },
+  productAnalytics: {
+    aggregate: jest.fn().mockResolvedValue({ _sum: { totalClicks: 0 } }),
+    create: jest.fn(),
+    upsert: jest.fn(),
+  },
   product: {
     findMany: jest.fn().mockResolvedValue([]),
     count: jest.fn().mockResolvedValue(0),
@@ -141,7 +146,8 @@ describe("DashboardService", () => {
         { id: "pv-1", createdAt: new Date() },
       ]);
       mockPrisma.shopLead.findMany.mockResolvedValue([
-        { id: "sl-1", source: "MAP_VIEW", createdAt: new Date() },
+        { id: "sl-1", source: "SHOP_PROFILE", metadata: { action: "SHOP_PROFILE_VIEW" }, createdAt: new Date() },
+        { id: "sl-2", source: "MAP_VIEW", metadata: { action: "MAP_OPEN" }, createdAt: new Date() },
       ]);
       mockPrisma.savedProduct.findMany.mockResolvedValue([]);
       mockPrisma.product.findMany.mockResolvedValue([]);
@@ -270,7 +276,7 @@ describe("DashboardService", () => {
 
       expect(mockPrisma.product.update).toHaveBeenCalledWith({
         where: { id: "prod-111" },
-        data: expect.objectContaining({ status: "DELETED" }),
+        data: expect.objectContaining({ status: "INACTIVE" }),
       });
     });
 

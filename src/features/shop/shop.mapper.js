@@ -24,6 +24,8 @@ function mapShopDetail(shop, options = {}) {
     ratingCount: shop.ratingCount || 0,
     viewCount: shop.viewCount || 0,
     leadCount: shop.leadCount || 0,
+    googleMapsUrl: shop.googleMapsUrl || null,
+    city: shop.city || address.city || null,
     category: mapCategory(shop.category),
     logo: shop.logo
       ? {
@@ -42,7 +44,7 @@ function mapShopDetail(shop, options = {}) {
     address: {
       street: address.street || "",
       landmark: address.landmark || null,
-      city: address.city || "",
+      city: shop.city || address.city || "",
       state: address.state || "",
       pincode: address.pincode || "",
       latitude: toNum(address.latitude),

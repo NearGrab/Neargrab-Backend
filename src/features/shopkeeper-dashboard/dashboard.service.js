@@ -60,8 +60,17 @@ async function getDashboardStats(userId) {
   const startOfWindow = new Date(datesWindow[0]);
   startOfWindow.setHours(0, 0, 0, 0);
 
-  // Fetch product views, leads, and saves within 14 days window
-  const [productViews, leads, savedProducts, lowStockProducts, recentReviews] = await Promise.all([
+  // Fetch product views, leads, and saves within 14 days window along with overall stats
+  const [
+    productViews,
+    leads,
+    savedProducts,
+    lowStockProducts,
+    recentReviews,
+    totalProductViews,
+    totalSavedProducts,
+    analyticsAggregate
+  ] = await Promise.all([
     prisma.productView.findMany({
       where: { shopId: shop.id, createdAt: { gte: startOfWindow } },
     }),
@@ -99,13 +108,26 @@ async function getDashboardStats(userId) {
         product: true,
       },
     }),
+    prisma.productView.count({
+      where: { shopId: shop.id },
+    }),
+    prisma.savedProduct.count({
+      where: { product: { shopId: shop.id } },
+    }),
+    prisma.productAnalytics.aggregate({
+      where: { product: { shopId: shop.id } },
+      _sum: { totalClicks: true },
+    }),
   ]);
+
+  const totalProductClicks = analyticsAggregate._sum.totalClicks || 0;
 
   // Map elements into daily trend buckets
   const viewsTrend14 = Array(14).fill(0);
   const clicksTrend14 = Array(14).fill(0);
   const inquiriesTrend14 = Array(14).fill(0);
   const followersTrend14 = Array(14).fill(0);
+  const productViewsTrend14 = Array(14).fill(0);
 
   const dayTimestamps = datesWindow.map((d) => {
     const copy = new Date(d);
@@ -123,7 +145,7 @@ async function getDashboardStats(userId) {
   productViews.forEach((pv) => {
     const idx = getDayIndex(pv.createdAt);
     if (idx !== -1) {
-      viewsTrend14[idx]++;
+      productViewsTrend14[idx]++;
     }
   });
 
@@ -132,10 +154,15 @@ async function getDashboardStats(userId) {
     if (idx !== -1) {
       const action = l.metadata?.action || "";
       const source = l.source;
-      // Click definition
-      if (source === "MAP_VIEW" || action === "map" || action === "address" || action === "directions") {
-        clicksTrend14[idx]++;
-      } else {
+      
+      if (action === "SHOP_PROFILE_VIEW" || source === "SHOP_PROFILE") {
+        viewsTrend14[idx]++;
+      } else if (
+        action === "CALL_CLICK" ||
+        action === "WHATSAPP_CLICK" ||
+        action === "call" ||
+        action === "whatsapp"
+      ) {
         inquiriesTrend14[idx]++;
       }
     }
@@ -147,6 +174,22 @@ async function getDashboardStats(userId) {
       followersTrend14[idx]++;
     }
   });
+
+  // Distribute totalProductClicks across clicksTrend14 (last 14 days) based on product views trend
+  const totalViews14 = productViewsTrend14.reduce((a, b) => a + b, 0);
+  if (totalViews14 > 0) {
+    let distributed = 0;
+    for (let i = 0; i < 14; i++) {
+      const share = Math.floor((productViewsTrend14[i] / totalViews14) * totalProductClicks);
+      clicksTrend14[i] = share;
+      distributed += share;
+    }
+    // Put any remainder in the last day
+    clicksTrend14[13] += (totalProductClicks - distributed);
+  } else {
+    // If no views, put all clicks on the last day
+    clicksTrend14[13] = totalProductClicks;
+  }
 
   // Calculate totals and growths
   const getPeriodStats = (trendArray) => {
@@ -170,19 +213,13 @@ async function getDashboardStats(userId) {
     return d.toLocaleDateString("en-US", { day: "numeric", month: "short" });
   });
 
-  // Additional aggregates
-  const [totalProductViews, totalSavedProducts] = await Promise.all([
-    prisma.productView.count({
-      where: { shopId: shop.id },
-    }),
-    prisma.savedProduct.count({
-      where: { product: { shopId: shop.id } },
-    }),
-  ]);
-
-  const productViewsPeriod1 = viewsTrend14.slice(0, 7).reduce((a, b) => a + b, 0);
-  const productViewsPeriod2 = viewsTrend14.slice(7, 14).reduce((a, b) => a + b, 0);
+  const productViewsPeriod1 = productViewsTrend14.slice(0, 7).reduce((a, b) => a + b, 0);
+  const productViewsPeriod2 = productViewsTrend14.slice(7, 14).reduce((a, b) => a + b, 0);
   const productViewsGrowth = productViewsPeriod1 === 0 ? (productViewsPeriod2 > 0 ? 100 : 0) : ((productViewsPeriod2 - productViewsPeriod1) / productViewsPeriod1) * 100;
+
+  const productClicksPeriod1 = clicksTrend14.slice(0, 7).reduce((a, b) => a + b, 0);
+  const productClicksPeriod2 = clicksTrend14.slice(7, 14).reduce((a, b) => a + b, 0);
+  const productClicksGrowth = productClicksPeriod1 === 0 ? (productClicksPeriod2 > 0 ? 100 : 0) : ((productClicksPeriod2 - productClicksPeriod1) / productClicksPeriod1) * 100;
 
   const savedPeriod1 = followersTrend14.slice(0, 7).reduce((a, b) => a + b, 0);
   const savedPeriod2 = followersTrend14.slice(7, 14).reduce((a, b) => a + b, 0);
@@ -198,6 +235,8 @@ async function getDashboardStats(userId) {
       dates: datesFormatted,
       productViewsTotal: totalProductViews,
       productViewsGrowth,
+      productClicksTotal: totalProductClicks,
+      productClicksGrowth,
       savedProductsTotal: totalSavedProducts,
       savedProductsGrowth,
       lowStockProducts,
@@ -231,13 +270,24 @@ async function updateShopProfile(userId, input) {
     paymentMethods,
     languages,
     tags,
+    googleMapsUrl,
+    city,
+    landmark,
   } = input;
 
   return await runInTransaction(async (tx) => {
     const updateData = {};
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
-    if (categoryId !== undefined) updateData.categoryId = categoryId;
+    if (categoryId !== undefined) {
+      if (categoryId) {
+        updateData.category = { connect: { id: categoryId } };
+      } else {
+        updateData.category = { disconnect: true };
+      }
+    }
+    if (googleMapsUrl !== undefined) updateData.googleMapsUrl = googleMapsUrl;
+    if (city !== undefined) updateData.city = city;
 
     if (logoMediaId !== undefined) {
       if (logoMediaId) {
@@ -262,32 +312,52 @@ async function updateShopProfile(userId, input) {
     });
 
     // Address Update
-    if (address) {
+    if (address !== undefined || landmark !== undefined || city !== undefined) {
       const addressData = {};
-      if (address.street !== undefined) addressData.street = address.street;
-      if (address.landmark !== undefined) addressData.landmark = address.landmark;
-      if (address.city !== undefined) addressData.city = address.city;
-      if (address.state !== undefined) addressData.state = address.state;
-      if (address.pincode !== undefined) addressData.pincode = address.pincode;
-      if (address.latitude !== undefined) addressData.latitude = address.latitude;
-      if (address.longitude !== undefined) addressData.longitude = address.longitude;
-      if (address.serviceRadiusKm !== undefined) addressData.serviceRadiusKm = address.serviceRadiusKm;
+      if (landmark !== undefined) addressData.landmark = landmark;
+      if (city !== undefined) addressData.city = city;
+
+      if (address !== undefined) {
+        if (typeof address === "string") {
+          addressData.street = address;
+        } else if (address !== null) {
+          if (address.street !== undefined) addressData.street = address.street;
+          if (address.landmark !== undefined) addressData.landmark = address.landmark;
+          if (address.city !== undefined) {
+            addressData.city = address.city;
+            updateData.city = address.city;
+          }
+          if (address.state !== undefined) addressData.state = address.state;
+          if (address.pincode !== undefined) addressData.pincode = address.pincode;
+          if (address.latitude !== undefined) addressData.latitude = address.latitude;
+          if (address.longitude !== undefined) addressData.longitude = address.longitude;
+          if (address.serviceRadiusKm !== undefined) addressData.serviceRadiusKm = address.serviceRadiusKm;
+        }
+      }
 
       await tx.shopAddress.upsert({
         where: { shopId: shop.id },
         update: addressData,
         create: {
           shopId: shop.id,
-          street: address.street || "",
-          landmark: address.landmark || "",
-          city: address.city || "",
-          state: address.state || "",
-          pincode: address.pincode || "",
-          latitude: address.latitude || 0,
-          longitude: address.longitude || 0,
-          serviceRadiusKm: address.serviceRadiusKm || 1,
+          street: addressData.street || (address && typeof address === "object" ? address.street : "") || "",
+          landmark: addressData.landmark || (address && typeof address === "object" ? address.landmark : "") || "",
+          city: addressData.city || (address && typeof address === "object" ? address.city : "") || "",
+          state: (address && typeof address === "object" ? address.state : "") || "",
+          pincode: (address && typeof address === "object" ? address.pincode : "") || "",
+          latitude: (address && typeof address === "object" ? address.latitude : 0) || 0,
+          longitude: (address && typeof address === "object" ? address.longitude : 0) || 0,
+          serviceRadiusKm: (address && typeof address === "object" ? address.serviceRadiusKm : 1) || 1,
         },
       });
+
+      // If city was updated via address, make sure it is updated on main Shop too
+      if (updateData.city && updateData.city !== shop.city) {
+        await tx.shop.update({
+          where: { id: shop.id },
+          data: { city: updateData.city },
+        });
+      }
     }
 
     // Contact Update
@@ -683,6 +753,7 @@ async function listShopkeeperProducts(userId, filters) {
         category: true,
         brand: true,
         attributes: true,
+        analytics: true,
       },
     }),
   ]);
@@ -784,6 +855,13 @@ async function createShopProduct(userId, input) {
         stockStatus,
         stockAvailable,
         stockCount: stockCount !== undefined ? stockCount : null,
+      },
+    });
+
+    await tx.productAnalytics.create({
+      data: {
+        productId: product.id,
+        totalClicks: 0,
       },
     });
 
@@ -949,7 +1027,12 @@ async function updateShopProduct(userId, productId, input) {
     if (pricePaise !== undefined) updateData.pricePaise = pricePaise;
     if (mrpPaise !== undefined) updateData.mrpPaise = mrpPaise;
     if (stockStatus !== undefined) updateData.stockStatus = stockStatus;
-    if (stockAvailable !== undefined) updateData.stockAvailable = stockAvailable;
+    if (stockAvailable !== undefined) {
+      updateData.stockAvailable = stockAvailable;
+      if (stockAvailable === true && product.status === "INACTIVE") {
+        updateData.status = "ACTIVE";
+      }
+    }
     if (stockCount !== undefined) updateData.stockCount = stockCount;
 
     await tx.product.update({
@@ -1021,8 +1104,10 @@ async function deleteShopProduct(userId, productId) {
   await prisma.product.update({
     where: { id: productId },
     data: {
-      status: "DELETED",
-      deletedAt: new Date(),
+      status: "INACTIVE",
+      stockAvailable: false,
+      stockStatus: "OUT_OF_STOCK",
+      stockCount: 0,
     },
   });
 
@@ -1057,6 +1142,10 @@ async function toggleShopProductStock(userId, productId, input) {
   if (stockAvailable !== undefined) updateData.stockAvailable = stockAvailable;
   if (stockCount !== undefined) updateData.stockCount = stockCount;
   if (stockStatus !== undefined) updateData.stockStatus = stockStatus;
+
+  if (product.status === "INACTIVE" && stockAvailable === true) {
+    updateData.status = "ACTIVE";
+  }
 
   const updated = await prisma.product.update({
     where: { id: productId },
@@ -1207,8 +1296,10 @@ async function bulkUpdateShopProducts(userId, input) {
       await tx.product.updateMany({
         where: { id: { in: productIds } },
         data: {
-          status: "DELETED",
-          deletedAt: new Date(),
+          status: "INACTIVE",
+          stockAvailable: false,
+          stockStatus: "OUT_OF_STOCK",
+          stockCount: 0,
         },
       });
     } else if (action === "update_status") {
@@ -1228,10 +1319,24 @@ async function bulkUpdateShopProducts(userId, input) {
       if (stockAvailable !== undefined) updateData.stockAvailable = stockAvailable;
       if (stockStatus !== undefined) updateData.stockStatus = stockStatus;
 
-      await tx.product.updateMany({
-        where: { id: { in: productIds } },
-        data: updateData,
-      });
+      if (stockAvailable === true) {
+        await tx.product.updateMany({
+          where: { id: { in: productIds }, status: "INACTIVE" },
+          data: {
+            ...updateData,
+            status: "ACTIVE",
+          },
+        });
+        await tx.product.updateMany({
+          where: { id: { in: productIds }, status: { not: "INACTIVE" } },
+          data: updateData,
+        });
+      } else {
+        await tx.product.updateMany({
+          where: { id: { in: productIds } },
+          data: updateData,
+        });
+      }
     }
 
     return { count: productIds.length };

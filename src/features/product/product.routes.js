@@ -87,4 +87,13 @@ router.post(
   productController.createProductFeedback
 );
 
+router.post(
+  "/:productId/click",
+  optionalAuth,
+  validate({
+    params: productSchema.productIdParam,
+  }),
+  productController.trackProductClick
+);
+
 module.exports = router;

@@ -18,6 +18,7 @@ const updateMeBody = z.object({
   city: z.string().trim().max(100).optional(),
   state: z.string().trim().max(100).optional(),
   pincode: z.string().trim().regex(pincodeRegex, "Pincode must be exactly 6 digits").optional(),
+  preferredCity: z.enum(["Surat", "Navsari", "Bardoli", "Vyara"]).optional(),
 });
 
 const updateProfileBody = z.object({

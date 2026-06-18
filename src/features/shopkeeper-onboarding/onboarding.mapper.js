@@ -25,7 +25,7 @@ function mapOnboardingState(shop) {
           "address.city",
           "address.state",
           "address.pincode",
-          "address.coordinates",
+          "address.googleMapsUrl",
           "contact.phone",
           "contact.whatsapp",
           "contact.timings",
@@ -61,6 +61,8 @@ function mapOnboardingState(shop) {
     verificationStatus: shop.verificationStatus,
     logo: shop.logo ? shop.logo.url : null,
     cover: shop.cover ? shop.cover.url : null,
+    googleMapsUrl: shop.googleMapsUrl,
+    city: shop.city,
     createdAt: shop.createdAt instanceof Date ? shop.createdAt.toISOString() : new Date().toISOString(),
     updatedAt: shop.updatedAt instanceof Date ? shop.updatedAt.toISOString() : new Date().toISOString(),
   };
@@ -70,12 +72,13 @@ function mapOnboardingState(shop) {
     ? {
         street: shop.address.street,
         landmark: shop.address.landmark,
-        city: shop.address.city,
+        city: shop.city || shop.address.city,
         state: shop.address.state,
         pincode: shop.address.pincode,
         latitude: Number(shop.address.latitude),
         longitude: Number(shop.address.longitude),
         serviceRadiusKm: Number(shop.address.serviceRadiusKm),
+        googleMapsUrl: shop.googleMapsUrl,
       }
     : null;
 
@@ -158,8 +161,8 @@ function mapOnboardingState(shop) {
   if (!shop.address?.city) missing.push("address.city");
   if (!shop.address?.state) missing.push("address.state");
   if (!shop.address?.pincode || shop.address.pincode.length !== 6) missing.push("address.pincode");
-  if (shop.address?.latitude === undefined || shop.address?.longitude === undefined || shop.address?.latitude === null || shop.address?.longitude === null) {
-    missing.push("address.coordinates");
+  if (!shop.googleMapsUrl) {
+    missing.push("address.googleMapsUrl");
   }
 
   // Contact validations
@@ -196,10 +199,8 @@ function mapOnboardingState(shop) {
     !!shop.address?.landmark &&
     !!shop.address?.city &&
     !!shop.address?.state &&
-    !!shop.address?.pincode &&
     shop.address.pincode.length === 6 &&
-    shop.address.latitude !== null &&
-    shop.address.longitude !== null;
+    !!shop.googleMapsUrl;
 
   const contactComplete =
     !!shop.contact?.phone &&

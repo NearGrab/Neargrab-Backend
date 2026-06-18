@@ -84,8 +84,8 @@ describe("SearchService", () => {
       );
     });
 
-    it("should filter by coordinate radius and sort by distance when coords are passed", async () => {
-      // Mock two products: one close (1.2km) and one far (15km)
+    it("should filter by city when city is passed", async () => {
+      mockPrisma.product.count.mockResolvedValue(1);
       mockPrisma.product.findMany.mockResolvedValue([
         {
           id: "prod-1",
@@ -106,40 +106,11 @@ describe("SearchService", () => {
             id: "shop-1",
             name: "Shop 1",
             slug: "shop-1",
+            city: "Navsari",
             verificationStatus: "VERIFIED",
             address: {
               city: "Navsari",
               pincode: "396445",
-              latitude: 20.9467,
-              longitude: 72.952, // exactly at target
-            },
-          },
-        },
-        {
-          id: "prod-2",
-          name: "Butter Far",
-          slug: "butter-far",
-          pricePaise: 25000,
-          currency: "INR",
-          status: "ACTIVE",
-          stockStatus: "IN_STOCK",
-          stockAvailable: true,
-          ratingAvg: 4.5,
-          reviewCount: 10,
-          viewCount: 50,
-          isPinned: false,
-          images: [],
-          shopId: "shop-2",
-          shop: {
-            id: "shop-2",
-            name: "Shop 2",
-            slug: "shop-2",
-            verificationStatus: "VERIFIED",
-            address: {
-              city: "Surat",
-              pincode: "395007",
-              latitude: 21.1702,
-              longitude: 72.8311, // ~30km away
             },
           },
         },
@@ -147,18 +118,22 @@ describe("SearchService", () => {
 
       const res = await searchService.searchProducts({
         q: "butter",
-        latitude: 20.9467,
-        longitude: 72.952,
-        radiusKm: 10,
-        sort: "distance",
+        city: "Navsari",
         page: 1,
         limit: 10,
       });
 
-      // Far butter should be filtered out
       expect(res.data).toHaveLength(1);
       expect(res.data[0].name).toBe("Butter Close");
-      expect(res.data[0].distanceKm).toBeLessThan(1.0);
+      expect(mockPrisma.product.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            shop: expect.objectContaining({
+              city: { equals: "Navsari", mode: "insensitive" },
+            }),
+          }),
+        })
+      );
     });
   });
 

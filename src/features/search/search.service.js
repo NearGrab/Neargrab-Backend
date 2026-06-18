@@ -52,14 +52,11 @@ async function searchProducts(params) {
   }
 
   // City filter
-  if (city) {
-    where.shop = {
-      ...where.shop,
-      address: {
-        city: { equals: city, mode: "insensitive" },
-      },
-    };
-  }
+  const activeCity = city || "Surat";
+  where.shop = {
+    ...where.shop,
+    city: { equals: activeCity, mode: "insensitive" },
+  };
 
   // Category filters
   if (categoryId) {
@@ -90,7 +87,7 @@ async function searchProducts(params) {
     if (maxPricePaise !== undefined) where.pricePaise.lte = maxPricePaise;
   }
 
-  const hasLocation = latitude !== undefined && longitude !== undefined;
+  const hasLocation = false; // Bypass GPS coordinates in search to filter only by city
 
   // Coordinate Radius Filter: Add bounding box to where condition for DB optimization
   if (hasLocation && radiusKm !== undefined) {
@@ -244,7 +241,7 @@ async function getSuggestions({ q, city, limit }) {
       status: "ACTIVE",
       deletedAt: null,
       name: { contains: searchVal, mode: "insensitive" },
-      ...(city ? { shop: { address: { city: { equals: city, mode: "insensitive" } } } } : {}),
+      ...(city ? { shop: { city: { equals: city, mode: "insensitive" } } } : {}),
     },
     select: { name: true },
     distinct: ["name"],

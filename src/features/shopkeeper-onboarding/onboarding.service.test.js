@@ -375,6 +375,8 @@ describe("OnboardingService", () => {
         verificationStatus: "UNVERIFIED",
         logo: null,
         cover: null,
+        googleMapsUrl: "https://maps.google.com/?q=shop",
+        city: "Navsari",
         createdAt: new Date(),
         updatedAt: new Date(),
         address: {
