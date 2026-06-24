@@ -1,6 +1,7 @@
 const { sendSuccess } = require("../../lib/response");
 const dashboardService = require("./dashboard.service");
 const { mapShopDetail } = require("../shop/shop.mapper");
+const cache = require("../../lib/cache");
 const {
   mapDashboardProduct,
   mapDashboardReservation,
@@ -33,6 +34,7 @@ async function updateShopProfile(req, res, next) {
   try {
     const updated = await dashboardService.updateShopProfile(req.user.id, req.body);
     const data = mapShopDetail(updated, updated.stats);
+    cache.invalidate(["explore", "shop", "product", "search"]);
     sendSuccess(res, data);
   } catch (err) {
     next(err);
@@ -63,6 +65,7 @@ async function replaceShopTimings(req, res, next) {
       closesAt: t.closesAt,
       isClosed: t.isClosed,
     }));
+    cache.invalidate(["explore", "shop"]);
     sendSuccess(res, data);
   } catch (err) {
     next(err);
@@ -145,6 +148,7 @@ async function createShopProduct(req, res, next) {
   try {
     const product = await dashboardService.createShopProduct(req.user.id, req.body);
     const data = mapDashboardProduct(product);
+    cache.invalidate(["explore", "shop", "product", "search"]);
     sendSuccess(res, data);
   } catch (err) {
     next(err);
@@ -167,6 +171,7 @@ async function updateShopProduct(req, res, next) {
     const { productId } = req.params;
     const updated = await dashboardService.updateShopProduct(req.user.id, productId, req.body);
     const data = mapDashboardProduct(updated);
+    cache.invalidate(["explore", "shop", "product", "search"]);
     sendSuccess(res, data);
   } catch (err) {
     next(err);
@@ -177,6 +182,7 @@ async function deleteShopProduct(req, res, next) {
   try {
     const { productId } = req.params;
     const result = await dashboardService.deleteShopProduct(req.user.id, productId);
+    cache.invalidate(["explore", "shop", "product", "search"]);
     sendSuccess(res, result);
   } catch (err) {
     next(err);
@@ -188,6 +194,7 @@ async function toggleShopProductStock(req, res, next) {
     const { productId } = req.params;
     const updated = await dashboardService.toggleShopProductStock(req.user.id, productId, req.body);
     const data = mapDashboardProduct(updated);
+    cache.invalidate(["explore", "shop", "product", "search"]);
     sendSuccess(res, data);
   } catch (err) {
     next(err);
@@ -198,6 +205,7 @@ async function attachProductImage(req, res, next) {
   try {
     const { productId } = req.params;
     const pImg = await dashboardService.attachProductImage(req.user.id, productId, req.body);
+    cache.invalidate(["explore", "shop", "product", "search"]);
     sendSuccess(res, {
       id: pImg.id,
       mediaId: pImg.mediaId,
@@ -214,6 +222,7 @@ async function detachProductImage(req, res, next) {
   try {
     const { productId, imageId } = req.params;
     const result = await dashboardService.detachProductImage(req.user.id, productId, imageId);
+    cache.invalidate(["explore", "shop", "product", "search"]);
     sendSuccess(res, result);
   } catch (err) {
     next(err);
@@ -223,6 +232,7 @@ async function detachProductImage(req, res, next) {
 async function bulkUpdateShopProducts(req, res, next) {
   try {
     const result = await dashboardService.bulkUpdateShopProducts(req.user.id, req.body);
+    cache.invalidate(["explore", "shop", "product", "search"]);
     sendSuccess(res, result);
   } catch (err) {
     next(err);
@@ -261,6 +271,7 @@ async function createPromotionRequest(req, res, next) {
       endAt: banner.endAt,
       createdAt: banner.createdAt,
     };
+    cache.invalidate(["explore"]);
     sendSuccess(res, data);
   } catch (err) {
     next(err);

@@ -1,6 +1,7 @@
 const express = require("express");
 const { authenticate, optionalAuth } = require("../../middleware/auth.middleware");
 const validate = require("../../middleware/validate.middleware");
+const cacheMiddleware = require("../../middleware/cache.middleware");
 const productController = require("./product.controller");
 const productSchema = require("./product.schema");
 
@@ -20,6 +21,7 @@ router.get(
     params: productSchema.productIdParam,
     query: productSchema.storesQuery,
   }),
+  cacheMiddleware({ ttlSeconds: 60, tags: ["product", "shop"] }),
   productController.getAvailableStores
 );
 
@@ -30,6 +32,7 @@ router.get(
     params: productSchema.productIdParam,
     query: productSchema.similarQuery,
   }),
+  cacheMiddleware({ ttlSeconds: 60, tags: ["product"] }),
   productController.getSimilarProducts
 );
 
@@ -40,6 +43,7 @@ router.get(
     params: productSchema.productIdParam,
     query: productSchema.reviewsQuery,
   }),
+  cacheMiddleware({ ttlSeconds: 60, tags: ["product"] }),
   productController.listProductReviews
 );
 

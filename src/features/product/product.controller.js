@@ -1,5 +1,6 @@
 const { sendSuccess } = require("../../lib/response");
 const productService = require("./product.service");
+const cache = require("../../lib/cache");
 
 async function getProductDetail(req, res, next) {
   try {
@@ -56,6 +57,7 @@ async function createProductReview(req, res, next) {
       req.body,
       req.user
     );
+    cache.invalidate(["product", "shop", "explore"]);
     return sendSuccess(res, data);
   } catch (error) {
     return next(error);

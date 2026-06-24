@@ -81,6 +81,7 @@ describe("ShopService", () => {
   describe("getPublicShop", () => {
     it("should return public active shop details with stats", async () => {
       mockPrisma.shop.findFirst.mockResolvedValue(mockShop);
+      mockPrisma.shop.update.mockResolvedValue(mockShop);
       mockPrisma.product.count.mockResolvedValue(20);
       mockPrisma.review.count.mockResolvedValue(10);
 
@@ -95,7 +96,7 @@ describe("ShopService", () => {
       mockPrisma.shop.findFirst.mockResolvedValue(null);
 
       await expect(shopService.getPublicShop("does-not-exist")).rejects.toThrow(
-        "Shop not found"
+        "Shop not found or inactive"
       );
     });
   });

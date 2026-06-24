@@ -1,5 +1,6 @@
 const { sendSuccess } = require("../../lib/response");
 const shopService = require("./shop.service");
+const cache = require("../../lib/cache");
 
 async function getPublicShop(req, res, next) {
   try {
@@ -41,6 +42,7 @@ async function createShopReview(req, res, next) {
       req.body,
       req.user
     );
+    cache.invalidate(["shop", "explore"]);
     return sendSuccess(res, data);
   } catch (error) {
     return next(error);

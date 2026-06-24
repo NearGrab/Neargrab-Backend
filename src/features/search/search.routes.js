@@ -1,6 +1,7 @@
 const express = require("express");
 const validate = require("../../middleware/validate.middleware");
 const { optionalAuth } = require("../../middleware/auth.middleware");
+const cacheMiddleware = require("../../middleware/cache.middleware");
 const searchController = require("./search.controller");
 const searchSchema = require("./search.schema");
 
@@ -10,12 +11,14 @@ router.get(
   "/search/products",
   optionalAuth,
   validate({ query: searchSchema.searchQuery }),
+  cacheMiddleware({ ttlSeconds: 30, tags: ["search"] }),
   searchController.searchProducts
 );
 
 router.get(
   "/search/suggestions",
   validate({ query: searchSchema.suggestionsQuery }),
+  cacheMiddleware({ ttlSeconds: 30, tags: ["search"] }),
   searchController.getSuggestions
 );
 
