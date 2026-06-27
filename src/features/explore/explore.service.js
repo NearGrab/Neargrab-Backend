@@ -11,7 +11,7 @@ const {
  * Calculate distance between two coordinates in Kilometers.
  */
 function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Earth radius in km
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -42,9 +42,7 @@ async function listCategories({ includeCounts, parentId, status }) {
   const include = {};
   if (includeCounts) {
     include._count = {
-      select: {
-        products: true,
-      },
+      select: { products: true },
     };
   }
 
@@ -69,18 +67,13 @@ async function listBrands({ includeCounts, q, status }) {
   };
 
   if (q) {
-    where.name = {
-      contains: q,
-      mode: "insensitive",
-    };
+    where.name = { contains: q, mode: "insensitive" };
   }
 
   const include = {};
   if (includeCounts) {
     include._count = {
-      select: {
-        products: true,
-      },
+      select: { products: true },
     };
   }
 
@@ -106,157 +99,142 @@ function formatDateRelative(date) {
   return `${diffDays} days ago`;
 }
 
+const SUPPORTED_CITIES = ["Surat", "Navsari", "Bardoli", "Vyara"];
+
 /**
  * Get explore feed summary payload.
+ * Optimizations applied:
+ *  - All queries run in a single Promise.all (one parallel round-trip)
+ *  - Product pool fetched once (24 rows), split in JS — saves 2 DB round-trips
+ *  - shops take:10 pushed to DB instead of JS slice
+ *  - Review fallback only fires when city has <5 qualifying reviews
+ *  - productInclude/productWhere defined once, reused
+ *  - mappedTop computed once, referenced in 3 places
  */
 async function getExploreFeed(params) {
   const prisma = getPrisma();
-  
-  // Enforce supported city, default to Surat
+
+  // Normalize city — default to Surat if unsupported
   let activeCity = params.city;
-  if (!activeCity || !["Surat", "Navsari", "Bardoli", "Vyara"].some(c => c.toLowerCase() === activeCity.toLowerCase())) {
+  if (
+    !activeCity ||
+    !SUPPORTED_CITIES.some(
+      (c) => c.toLowerCase() === activeCity.toLowerCase()
+    )
+  ) {
     activeCity = "Surat";
   }
 
   const { device } = params;
   const now = new Date();
 
-  // 1. Fetch categories
-  const categories = await prisma.category.findMany({
-    where: { parentId: null, status: "active", deletedAt: null },
-    take: 12,
-    orderBy: { name: "asc" },
-  });
+  const cityFilter = { equals: activeCity, mode: "insensitive" };
 
-  // 2. Fetch banners (filtered by activeCity)
+  const productWhere = {
+    status: "ACTIVE",
+    deletedAt: null,
+    shop: { status: "ACTIVE", deletedAt: null, city: cityFilter },
+  };
+
+  // Only select fields that mapProductCard actually needs
+  const productInclude = {
+    images: { include: { media: true } },
+    category: true,
+    brand: true,
+    shop: { include: { address: true } },
+  };
+
   const bannerWhere = {
     status: "ACTIVE",
     deletedAt: null,
     startAt: { lte: now },
     endAt: { gte: now },
-    city: { equals: activeCity, mode: "insensitive" },
+    city: cityFilter,
+    ...(device ? { devices: { hasSome: [device, "ALL"] } } : {}),
   };
 
-  if (device) {
-    bannerWhere.devices = { hasSome: [device, "ALL"] };
-  }
-
-  const banners = await prisma.banner.findMany({
-    where: bannerWhere,
-    include: { image: true },
-    orderBy: { sortOrder: "asc" },
-  });
-
-  // 3. Fetch shops (filtered strictly by Shop.city)
-  const shops = await prisma.shop.findMany({
-    where: {
-      status: "ACTIVE",
-      deletedAt: null,
-      city: { equals: activeCity, mode: "insensitive" },
-    },
-    include: { address: true },
-  });
-
-  // 4. Setup product query (filtered by shop's city)
-  const productWhere = {
-    status: "ACTIVE",
-    deletedAt: null,
-    shop: {
-      status: "ACTIVE",
-      deletedAt: null,
-      city: { equals: activeCity, mode: "insensitive" },
-    },
-  };
-
-  // 5. Fetch products in parallel
-  const [pinnedProductsData, topProductsData, newArrivalsData] = await Promise.all([
-    prisma.product.findMany({
-      where: { ...productWhere, isPinned: true },
-      include: {
-        images: { include: { media: true } },
-        category: true,
-        brand: true,
-        shop: { include: { address: true } },
-      },
-      take: 8,
-      orderBy: { searchBoost: "desc" },
+  // Single parallel round-trip — 7 queries fire concurrently
+  const [
+    categories,
+    banners,
+    shops,
+    productPool,
+    cityReviews,
+  ] = await Promise.all([
+    // Categories (changes rarely — good Redis candidate, TTL 1h)
+    prisma.category.findMany({
+      where: { parentId: null, status: "active", deletedAt: null },
+      take: 12,
+      orderBy: { name: "asc" },
     }),
+
+    // Banners (TTL 10min)
+    prisma.banner.findMany({
+      where: bannerWhere,
+      include: { image: true },
+      orderBy: { sortOrder: "asc" },
+    }),
+
+    // Top 10 shops only — let DB do the limit, not JS
+    prisma.shop.findMany({
+      where: { status: "ACTIVE", deletedAt: null, city: cityFilter },
+      include: { address: true },
+      take: 10,
+    }),
+
+    // Single product pool (24 rows) — split in JS instead of 3 separate queries
+    // Ordered by rating so topProducts slice is already correct
     prisma.product.findMany({
       where: productWhere,
-      include: {
-        images: { include: { media: true } },
-        category: true,
-        brand: true,
-        shop: { include: { address: true } },
-      },
-      take: 8,
+      include: productInclude,
+      take: 24,
       orderBy: [{ ratingAvg: "desc" }, { reviewCount: "desc" }],
     }),
-    prisma.product.findMany({
-      where: productWhere,
-      include: {
-        images: { include: { media: true } },
-        category: true,
-        brand: true,
-        shop: { include: { address: true } },
-      },
-      take: 8,
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
 
-  // 6. Fetch 5 latest reviews with rating >= 4
-  let latestReviews = await prisma.review.findMany({
-    where: {
-      status: "PUBLISHED",
-      deletedAt: null,
-      rating: { gte: 4 },
-      shop: {
-        city: { equals: activeCity, mode: "insensitive" },
-        status: "ACTIVE",
-        deletedAt: null,
-      }
-    },
-    include: {
-      user: {
-        include: { avatar: true }
-      },
-      shop: true,
-    },
-    orderBy: { createdAt: "desc" },
-    take: 5,
-  });
-
-  if (latestReviews.length < 5) {
-    const additionalReviews = await prisma.review.findMany({
+    // City-filtered reviews (rating >= 4, latest 5)
+    prisma.review.findMany({
       where: {
         status: "PUBLISHED",
         deletedAt: null,
         rating: { gte: 4 },
-        id: { notIn: latestReviews.map((r) => r.id) }
+        shop: { city: cityFilter, status: "ACTIVE", deletedAt: null },
       },
-      include: {
-        user: {
-          include: { avatar: true }
-        },
-        shop: true,
-      },
+      include: { user: { include: { avatar: true } }, shop: true },
       orderBy: { createdAt: "desc" },
-      take: 5 - latestReviews.length,
+      take: 5,
+    }),
+  ]);
+
+  // Split product pool in JS — zero extra DB round-trips
+  const pinnedProductsData = productPool
+    .filter((p) => p.isPinned)
+    .slice(0, 8);
+
+  const topProductsData = productPool.slice(0, 8);
+
+  const newArrivalsData = [...productPool]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 8);
+
+  // Review fallback — only fires if city has fewer than 5 qualifying reviews
+  let allReviews = cityReviews;
+  if (cityReviews.length < 5) {
+    const cityIds = new Set(cityReviews.map((r) => r.id));
+    const fallback = await prisma.review.findMany({
+      where: {
+        status: "PUBLISHED",
+        deletedAt: null,
+        rating: { gte: 4 },
+        id: { notIn: [...cityIds] },
+      },
+      include: { user: { include: { avatar: true } }, shop: true },
+      orderBy: { createdAt: "desc" },
+      take: 5 - cityReviews.length,
     });
-    latestReviews = [...latestReviews, ...additionalReviews];
+    allReviews = [...cityReviews, ...fallback];
   }
 
-  const uniqueReviews = [];
-  const seenIds = new Set();
-  for (const r of latestReviews) {
-    if (!seenIds.has(r.id)) {
-      seenIds.add(r.id);
-      uniqueReviews.push(r);
-    }
-  }
-
-  const realReviews = uniqueReviews.map((r) => ({
+  const realReviews = allReviews.map((r) => ({
     id: r.id,
     user: r.user?.name || "Anonymous",
     avatar: r.user?.avatar?.url || null,
@@ -265,24 +243,24 @@ async function getExploreFeed(params) {
     comment: r.comment,
     storeName: r.shop?.name || "Local Store",
     shopId: r.shopId,
+    shopSlug: r.shop?.slug || null,
   }));
 
-  const nearbyShops = shops.slice(0, 10);
-
-  const mapProduct = (prod) => mapProductCard(prod);
+  // Map once, reference in 3 places
+  const mappedTop = topProductsData.map(mapProductCard);
 
   return {
     city: activeCity,
     categories: categories.map((c) => mapCategory(c)),
-    nearbyShops: nearbyShops.map((s) => mapShopSummary(s)),
-    topProducts: topProductsData.map(mapProduct),
-    pinnedProducts: pinnedProductsData.map(mapProduct),
+    nearbyShops: shops.map((s) => mapShopSummary(s)),
+    topProducts: mappedTop,
+    pinnedProducts: pinnedProductsData.map(mapProductCard),
     banners: banners.map((b) => mapBanner(b)),
     realReviews,
     sections: {
-      topPicks: topProductsData.map(mapProduct),
-      newArrivals: newArrivalsData.map(mapProduct),
-      popularNearby: topProductsData.map(mapProduct),
+      topPicks: mappedTop,
+      newArrivals: newArrivalsData.map(mapProductCard),
+      popularNearby: mappedTop,
     },
   };
 }

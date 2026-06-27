@@ -16,6 +16,7 @@ async function getActiveShop(shopIdOrSlug) {
       OR: [
         { id: shopIdOrSlug },
         { slug: shopIdOrSlug },
+        { username: shopIdOrSlug },
       ],
       status: "ACTIVE",
       deletedAt: null,
@@ -44,6 +45,7 @@ async function getPublicShop(shopIdOrSlug, currentUser = null) {
       OR: [
         { id: shopIdOrSlug },
         { slug: shopIdOrSlug },
+        { username: shopIdOrSlug },
       ],
       status: "ACTIVE",
       deletedAt: null,
