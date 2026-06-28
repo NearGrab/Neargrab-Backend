@@ -274,8 +274,8 @@ model Shop {
   type               String?
   establishedYear    Int?
   description        String?
-  gstNumber          String?
-  panNumber          String?
+//   gstNumber          String?
+//   panNumber          String?
   status             ShopStatus         @default(DRAFT)
   verificationStatus VerificationStatus @default(UNVERIFIED)
   logoId             String?

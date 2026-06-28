@@ -308,7 +308,7 @@ async function updateDetails(userId, data) {
         categoryId: resolvedCategoryId,
         type: data.type,
         establishedYear: data.establishedYear || null,
-        gstNumber: data.gstNumber || null,
+        // gstNumber: data.gstNumber || null,
         description: data.description,
         logoId,
       },
@@ -467,13 +467,13 @@ async function updateBusiness(userId, data) {
 
   await runInTransaction(async (tx) => {
     // 1. Update GST & PAN
-    await tx.shop.update({
-      where: { id: shop.id },
-      data: {
-        gstNumber: data.gstNumber || null,
-        panNumber: data.panNumber || null,
-      },
-    });
+    // await tx.shop.update({
+    //   where: { id: shop.id },
+    //   data: {
+    //     gstNumber: data.gstNumber || null,
+    //     panNumber: data.panNumber || null,
+    //   },
+    // });
 
     // 2. Languages
     await tx.shopLanguage.deleteMany({ where: { shopId: shop.id } });
@@ -523,21 +523,21 @@ async function updateBusiness(userId, data) {
       data: paymentMethods,
     });
 
-    // 5. Registration Document
-    if (data.registrationDocMediaId) {
-      const mediaId = await resolveMediaAsset(data.registrationDocMediaId, userId, tx);
-      await tx.shopPhoto.deleteMany({
-        where: { shopId: shop.id, kind: "registration_doc" },
-      });
-      await tx.shopPhoto.create({
-        data: {
-          shopId: shop.id,
-          mediaId,
-          kind: "registration_doc",
-          sortOrder: 0,
-        },
-      });
-    }
+    // 5. Registration Document (Removed)
+    // if (data.registrationDocMediaId) {
+    //   const mediaId = await resolveMediaAsset(data.registrationDocMediaId, userId, tx);
+    //   await tx.shopPhoto.deleteMany({
+    //     where: { shopId: shop.id, kind: "registration_doc" },
+    //   });
+    //   await tx.shopPhoto.create({
+    //     data: {
+    //       shopId: shop.id,
+    //       mediaId,
+    //       kind: "registration_doc",
+    //       sortOrder: 0,
+    //     },
+    //   });
+    // }
   });
 
   return getOnboardingState(userId);

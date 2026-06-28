@@ -67,8 +67,8 @@ function mapAdminShop(shop) {
     leadCount: shop.leadCount || 0,
     establishedYear: shop.establishedYear,
     description: shop.description,
-    gstNumber: shop.gstNumber,
-    panNumber: shop.panNumber,
+    // gstNumber: shop.gstNumber,
+    // panNumber: shop.panNumber,
     address: shop.address
       ? {
           street: shop.address.street,

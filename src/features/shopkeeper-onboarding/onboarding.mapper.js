@@ -30,7 +30,6 @@ function mapOnboardingState(shop) {
           "contact.whatsapp",
           "contact.timings",
           "business.languages",
-          "business.registrationDoc",
           "photos.front",
           "photos.inside",
         ],
@@ -55,8 +54,8 @@ function mapOnboardingState(shop) {
     type: shop.type,
     establishedYear: shop.establishedYear,
     description: shop.description,
-    gstNumber: shop.gstNumber,
-    panNumber: shop.panNumber,
+    // gstNumber: shop.gstNumber,
+    // panNumber: shop.panNumber,
     status: shop.status,
     verificationStatus: shop.verificationStatus,
     logo: shop.logo ? shop.logo.url : null,
@@ -173,8 +172,8 @@ function mapOnboardingState(shop) {
 
   // Business validations
   if (languages.length === 0) missing.push("business.languages");
-  const registrationDoc = rawPhotos.find((p) => p.kind === "registration_doc");
-  if (!registrationDoc) missing.push("business.registrationDoc");
+  // const registrationDoc = rawPhotos.find((p) => p.kind === "registration_doc");
+  // if (!registrationDoc) missing.push("business.registrationDoc");
   const upiEnabled = paymentMethods.find((p) => p.method === "UPI")?.enabled;
   const upiId = paymentMethods.find((p) => p.method === "UPI")?.upiId;
   if (upiEnabled && !upiId) missing.push("business.upiId");
@@ -209,7 +208,6 @@ function mapOnboardingState(shop) {
 
   const businessComplete =
     languages.length > 0 &&
-    !!registrationDoc &&
     (!upiEnabled || !!upiId);
 
   const photosComplete = hasFrontPhoto && hasInsidePhoto;

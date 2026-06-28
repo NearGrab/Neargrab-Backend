@@ -54,6 +54,7 @@ const addressBody = z.object({
   }),
   radius: z.string().trim().optional(),
   serviceRadiusKm: z.number().min(0.5).max(25).optional(),
+  googleMapsUrl: z.string().trim().optional().or(z.literal("")),
 });
 
 const contactBody = z.object({
