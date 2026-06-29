@@ -1,8 +1,6 @@
 require("dotenv").config();
 const bcrypt = require("bcrypt");
-const { PrismaClient } = require("@prisma/client");
-
-const prisma = new PrismaClient();
+const { prisma } = require("../src/config/prisma");
 
 const PASSWORD = "Neargrab@123";
 const now = new Date();

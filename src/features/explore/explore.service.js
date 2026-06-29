@@ -133,6 +133,7 @@ async function getExploreFeed(params) {
   const productWhere = {
     status: "ACTIVE",
     deletedAt: null,
+    isPinned: true,
     shop: { status: "ACTIVE", deletedAt: null, city: cityFilter },
   };
 

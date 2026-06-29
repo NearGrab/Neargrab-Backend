@@ -1,5 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const { prisma } = require("./config/prisma");
 
 async function main() {
   const halfHourAgo = new Date(Date.now() - 60 * 60 * 1000);

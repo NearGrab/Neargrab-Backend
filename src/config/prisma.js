@@ -1,11 +1,21 @@
 const { PrismaClient } = require("@prisma/client");
+const { PrismaPg } = require("@prisma/adapter-pg");
+const { Pool } = require("pg");
 const env = require("./env");
 const logger = require("./logger");
 
 let prisma;
+let pool;
 
 function createPrismaClient() {
+  pool = new Pool({
+    connectionString: env.DATABASE_URL,
+    max: 3,
+  });
+  const adapter = new PrismaPg(pool);
+  
   return new PrismaClient({
+    adapter,
     log:
       env.NODE_ENV === "development"
         ? [
@@ -42,6 +52,10 @@ async function disconnectPrisma() {
   if (prisma) {
     await prisma.$disconnect();
     prisma = undefined;
+  }
+  if (pool) {
+    await pool.end();
+    pool = undefined;
   }
 }
 
