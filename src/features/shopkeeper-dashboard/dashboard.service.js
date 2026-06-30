@@ -873,6 +873,7 @@ async function createShopProduct(userId, input) {
     stockCount,
     attributes,
     imageMediaIds,
+    status,
   } = input;
 
   // SKU validation
@@ -915,7 +916,7 @@ async function createShopProduct(userId, input) {
         tags: tags || [],
         pricePaise,
         mrpPaise: mrpPaise || null,
-        status: "ACTIVE", // Default to active for merchant listing
+        status: status || "ACTIVE",
         stockStatus,
         stockAvailable,
         stockCount: stockCount !== undefined ? stockCount : null,
@@ -1054,6 +1055,7 @@ async function updateShopProduct(userId, productId, input) {
     stockCount,
     attributes,
     imageMediaIds,
+    status,
   } = input;
 
   // SKU validation
@@ -1098,6 +1100,7 @@ async function updateShopProduct(userId, productId, input) {
       }
     }
     if (stockCount !== undefined) updateData.stockCount = stockCount;
+    if (status !== undefined) updateData.status = status;
 
     await tx.product.update({
       where: { id: productId },

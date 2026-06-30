@@ -82,6 +82,7 @@ const createProductBody = z.object({
   stockStatus: z.enum(["IN_STOCK", "LOW_STOCK", "OUT_OF_STOCK"]).default("IN_STOCK"),
   stockAvailable: z.boolean().default(true),
   stockCount: z.number().int().nonnegative().optional().nullable(),
+  status: z.enum(["DRAFT", "PENDING_APPROVAL", "ACTIVE", "FLAGGED", "INACTIVE", "DELETED"]).optional(),
   attributes: z.array(z.object({
     key: z.string().trim().min(1),
     value: z.string().trim().min(1),
