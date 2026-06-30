@@ -8,8 +8,10 @@ const { mapShopDetail, mapShopUpdate } = require("./shop.mapper");
 
 /**
  * Helper to fetch shop by ID or slug and throw if inactive/missing.
+ * Only selects the columns needed for downstream lookups (id, ownerId)
+ * to keep this a cheap index-only-ish read.
  */
-async function getActiveShop(shopIdOrSlug) {
+async function getActiveShop(shopIdOrSlug, select = { id: true }) {
   const prisma = getPrisma();
   const shop = await prisma.shop.findFirst({
     where: {
@@ -21,6 +23,7 @@ async function getActiveShop(shopIdOrSlug) {
       status: "ACTIVE",
       deletedAt: null,
     },
+    select,
   });
 
   if (!shop) {
@@ -36,21 +39,79 @@ async function getActiveShop(shopIdOrSlug) {
 
 /**
  * Returns public shop profile detail.
+ *
+ * Perf notes:
+ * - Step 1 is a minimal `select` (id, ownerId) just to validate the shop
+ *   exists/is active, instead of pulling the full row.
+ * - The viewCount increment is fired WITHOUT awaiting it (it's a
+ *   fire-and-forget analytics counter; it shouldn't block the response).
+ * - The detail fetch (heavy include), the 4 aggregate counts, and the
+ *   isFollowing lookup all run in a single Promise.all instead of three
+ *   sequential stages, cutting round-trips from ~4 to ~2.
  */
 async function getPublicShop(shopIdOrSlug, currentUser = null) {
   const prisma = getPrisma();
 
-  let shop = await prisma.shop.findFirst({
-    where: {
-      OR: [
-        { id: shopIdOrSlug },
-        { slug: shopIdOrSlug },
-        { username: shopIdOrSlug },
-      ],
-      status: "ACTIVE",
-      deletedAt: null,
-    },
-  });
+  const shopRef = await getActiveShop(shopIdOrSlug, { id: true, ownerId: true });
+
+  // Fire-and-forget view count increment — do not block the response on this.
+  prisma.shop
+    .update({
+      where: { id: shopRef.id },
+      data: { viewCount: { increment: 1 } },
+    })
+    .catch((err) => {
+      // Swallow/log — a missed view count increment should never fail the request.
+      // eslint-disable-next-line no-console
+      console.error("viewCount increment failed for shop", shopRef.id, err);
+    });
+
+  const followQuery = currentUser
+    ? prisma.userFollow.findUnique({
+        where: {
+          followerId_followingId: {
+            followerId: currentUser.id,
+            followingId: shopRef.ownerId,
+          },
+        },
+      })
+    : Promise.resolve(null);
+
+  const [shop, productCount, reviewCount, followersCount, followingCount, followRecord] =
+    await Promise.all([
+      prisma.shop.findUnique({
+        where: { id: shopRef.id },
+        include: {
+          category: true,
+          logo: true,
+          cover: true,
+          address: true,
+          contact: true,
+          timings: true,
+          photos: {
+            include: {
+              media: true,
+            },
+          },
+          paymentMethods: true,
+          languages: true,
+          tags: true,
+        },
+      }),
+      prisma.product.count({
+        where: { shopId: shopRef.id, status: "ACTIVE", deletedAt: null },
+      }),
+      prisma.review.count({
+        where: { shopId: shopRef.id, status: "PUBLISHED" },
+      }),
+      prisma.userFollow.count({
+        where: { followingId: shopRef.ownerId },
+      }),
+      prisma.userFollow.count({
+        where: { followerId: shopRef.ownerId },
+      }),
+      followQuery,
+    ]);
 
   if (!shop) {
     throw new AppError({
@@ -60,57 +121,7 @@ async function getPublicShop(shopIdOrSlug, currentUser = null) {
     });
   }
 
-  // Increment viewCount and retrieve with full relations
-  shop = await prisma.shop.update({
-    where: { id: shop.id },
-    data: {
-      viewCount: { increment: 1 },
-    },
-    include: {
-      category: true,
-      logo: true,
-      cover: true,
-      address: true,
-      contact: true,
-      timings: true,
-      photos: {
-        include: {
-          media: true,
-        },
-      },
-      paymentMethods: true,
-      languages: true,
-      tags: true,
-    },
-  });
-
-  const [productCount, reviewCount, followersCount, followingCount] = await Promise.all([
-    prisma.product.count({
-      where: { shopId: shop.id, status: "ACTIVE", deletedAt: null },
-    }),
-    prisma.review.count({
-      where: { shopId: shop.id, status: "PUBLISHED" },
-    }),
-    prisma.userFollow.count({
-      where: { followingId: shop.ownerId },
-    }),
-    prisma.userFollow.count({
-      where: { followerId: shop.ownerId },
-    }),
-  ]);
-
-  let isFollowing = false;
-  if (currentUser) {
-    const followRecord = await prisma.userFollow.findUnique({
-      where: {
-        followerId_followingId: {
-          followerId: currentUser.id,
-          followingId: shop.ownerId,
-        },
-      },
-    });
-    isFollowing = !!followRecord;
-  }
+  const isFollowing = !!followRecord;
 
   return mapShopDetail(shop, { productCount, reviewCount, followersCount, followingCount, isFollowing });
 }

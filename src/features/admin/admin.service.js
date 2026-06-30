@@ -25,6 +25,8 @@ function calculateTrend(current, previous) {
   return parseFloat((((current - previous) / previous) * 100).toFixed(1));
 }
 
+const NON_ADMIN_ROLES = { notIn: ["ADMIN", "SUPER_ADMIN", "SUPPORT_ADMIN", "CONTENT_ADMIN"] };
+
 // 1. Admin Authentication & Profile
 async function adminLogin({ email, password, userAgent = null, ipAddress = null }) {
   const prisma = getPrisma();
@@ -70,12 +72,15 @@ async function adminLogin({ email, password, userAgent = null, ipAddress = null 
     });
   }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { lastLoginAt: new Date() },
-  });
+  // lastLoginAt update and session creation are independent writes — run in parallel.
+  const [, { session, rawRefreshToken }] = await Promise.all([
+    prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    }),
+    tokenService.createSession(user.id, userAgent, ipAddress),
+  ]);
 
-  const { session, rawRefreshToken } = await tokenService.createSession(user.id, userAgent, ipAddress);
   const accessToken = tokenService.generateAccessToken(user, session);
 
   const { passwordHash: _, ...safeUser } = user;
@@ -113,7 +118,20 @@ async function getDashboardSummary() {
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
-  // System Summary
+  const sourceMetadata = {
+    SEARCH: { label: "In-App Search", color: "#1F6E43" },
+    MAP_VIEW: { label: "Map View", color: "#28B463" },
+    SHOP_PROFILE: { label: "Shop Profile", color: "#F1C40F" },
+    CATEGORY_BROWSE: { label: "Category Browse", color: "#A9DFBF" },
+    PRODUCT_PAGE: { label: "Product Page", color: "#F59E0B" },
+    BANNER: { label: "Banner", color: "#3498DB" },
+    OTHER: { label: "Others", color: "#E5E8E8" },
+  };
+
+  // Every query below is independent — this used to run as 5 sequential
+  // stages (system summary block, totals block, an unbounded city fetch,
+  // an unbounded source fetch, then audit logs). It's now a single
+  // parallel batch.
   const [
     activeUsers,
     activeShops,
@@ -123,26 +141,6 @@ async function getDashboardSummary() {
     openTickets,
     flaggedProducts,
     flaggedReviews,
-  ] = await Promise.all([
-    prisma.user.count({
-      where: {
-        status: "ACTIVE",
-        role: { notIn: ["ADMIN", "SUPER_ADMIN", "SUPPORT_ADMIN", "CONTENT_ADMIN"] },
-      },
-    }),
-    prisma.shop.count({ where: { status: "ACTIVE" } }),
-    prisma.product.count({ where: { status: "ACTIVE", stockStatus: "IN_STOCK" } }),
-    prisma.product.count({ where: { status: "ACTIVE", stockStatus: "OUT_OF_STOCK" } }),
-    prisma.review.count({ where: { status: "PENDING" } }),
-    prisma.feedback.count({ where: { status: "open" } }),
-    prisma.product.count({ where: { OR: [{ status: "FLAGGED" }, { isFlagged: true }] } }),
-    prisma.review.count({ where: { status: "FLAGGED" } }),
-  ]);
-
-  const flaggedContent = flaggedProducts + flaggedReviews;
-
-  // Totals & Trends counts
-  const [
     totalUsersCount,
     totalProductsCount,
     totalShopsCount,
@@ -160,37 +158,75 @@ async function getDashboardSummary() {
     newShopsPrev7,
     productsLast7,
     productsPrev7,
+    leadsBySourceGroups,
+    topCitiesRaw,
+    logs,
   ] = await Promise.all([
-    prisma.user.count({ where: { deletedAt: null, role: { notIn: ["ADMIN", "SUPER_ADMIN", "SUPPORT_ADMIN", "CONTENT_ADMIN"] } } }),
+    prisma.user.count({ where: { status: "ACTIVE", role: NON_ADMIN_ROLES } }),
+    prisma.shop.count({ where: { status: "ACTIVE" } }),
+    prisma.product.count({ where: { status: "ACTIVE", stockStatus: "IN_STOCK" } }),
+    prisma.product.count({ where: { status: "ACTIVE", stockStatus: "OUT_OF_STOCK" } }),
+    prisma.review.count({ where: { status: "PENDING" } }),
+    prisma.feedback.count({ where: { status: "open" } }),
+    prisma.product.count({ where: { OR: [{ status: "FLAGGED" }, { isFlagged: true }] } }),
+    prisma.review.count({ where: { status: "FLAGGED" } }),
+
+    prisma.user.count({ where: { deletedAt: null, role: NON_ADMIN_ROLES } }),
     prisma.product.count({ where: { deletedAt: null } }),
     prisma.shop.count({ where: { deletedAt: null } }),
     prisma.review.count({ where: { deletedAt: null } }),
     prisma.shopLead.count(),
-    
-    // shops trends
+
     prisma.shop.count({ where: { createdAt: { gte: sevenDaysAgo }, deletedAt: null } }),
     prisma.shop.count({ where: { createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo }, deletedAt: null } }),
-    
-    // reviews trends
+
     prisma.review.count({ where: { createdAt: { gte: sevenDaysAgo }, deletedAt: null } }),
     prisma.review.count({ where: { createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo }, deletedAt: null } }),
-    
-    // leads trends
+
     prisma.shopLead.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
     prisma.shopLead.count({ where: { createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo } } }),
-    
-    // new users
-    prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo }, role: { notIn: ["ADMIN", "SUPER_ADMIN", "SUPPORT_ADMIN", "CONTENT_ADMIN"] } } }),
-    prisma.user.count({ where: { createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo }, role: { notIn: ["ADMIN", "SUPER_ADMIN", "SUPPORT_ADMIN", "CONTENT_ADMIN"] } } }),
-    
-    // new shops
+
+    prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo }, role: NON_ADMIN_ROLES } }),
+    prisma.user.count({ where: { createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo }, role: NON_ADMIN_ROLES } }),
+
     prisma.shop.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
     prisma.shop.count({ where: { createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo } } }),
-    
-    // products added
+
     prisma.product.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
     prisma.product.count({ where: { createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo } } }),
+
+    // `source` is a direct scalar column on ShopLead — native groupBy works,
+    // no raw SQL needed. Replaces an unbounded findMany of every lead's
+    // source field.
+    prisma.shopLead.groupBy({
+      by: ["source"],
+      _count: { _all: true },
+    }),
+
+    // City lives on the related ShopAddress, which Prisma's groupBy can't
+    // join across — this needs a raw aggregate instead of pulling every
+    // lead row (with a nested shop->address join) into Node to count in JS.
+    // NOTE: assumes default Prisma table/column mapping (PascalCase model
+    // names, camelCase columns, no @@map/@@field overrides). Verify against
+    // your schema.prisma and adjust identifiers if it differs.
+    prisma.$queryRaw`
+      SELECT sa.city AS city, COUNT(*)::int AS count
+      FROM "ShopLead" sl
+      JOIN "Shop" s ON s.id = sl."shopId"
+      JOIN "ShopAddress" sa ON sa."shopId" = s.id
+      WHERE sa.city IS NOT NULL
+      GROUP BY sa.city
+      ORDER BY count DESC
+    `,
+
+    prisma.auditLog.findMany({
+      take: 5,
+      orderBy: { createdAt: "desc" },
+      include: { actor: true },
+    }),
   ]);
+
+  const flaggedContent = flaggedProducts + flaggedReviews;
 
   const totalShopsTrend = calculateTrend(shopsLast7, shopsPrev7);
   const totalReviewsTrend = calculateTrend(reviewsLast7, reviewsPrev7);
@@ -199,61 +235,22 @@ async function getDashboardSummary() {
   const newShopsTrend = calculateTrend(newShopsLast7, newShopsPrev7);
   const productsAddedTrend = calculateTrend(productsLast7, productsPrev7);
 
-  // Top Cities Group By leads (ShopLead joined with ShopAddress)
-  const leads = await prisma.shopLead.findMany({
-    select: {
-      shop: {
-        select: {
-          address: {
-            select: { city: true },
-          },
-        },
-      },
-    },
-  });
-
-  const cityCounts = {};
-  for (const lead of leads) {
-    const city = lead.shop?.address?.city;
-    if (city) {
-      cityCounts[city] = (cityCounts[city] || 0) + 1;
-    }
-  }
-
-  const sortedCities = Object.entries(cityCounts)
-    .map(([city, count]) => ({ city, leads: count }))
-    .sort((a, b) => b.leads - a.leads);
-
-  const maxLeads = sortedCities[0]?.leads || 1;
-  const topCities = sortedCities.map((item) => ({
-    city: item.city,
-    leads: item.leads,
-    percent: parseFloat(((item.leads / maxLeads) * 100).toFixed(1)),
+  // Top cities, from the raw aggregate (already grouped + sorted by the DB).
+  const maxLeads = topCitiesRaw[0]?.count || 1;
+  const topCities = topCitiesRaw.map((row) => ({
+    city: row.city,
+    leads: row.count,
+    percent: parseFloat(((row.count / maxLeads) * 100).toFixed(1)),
   }));
 
-  // Leads By Source percentages
-  const sourceMetadata = {
-    SEARCH: { label: "In-App Search", color: "#1F6E43" },
-    MAP_VIEW: { label: "Map View", color: "#28B463" },
-    SHOP_PROFILE: { label: "Shop Profile", color: "#F1C40F" },
-    CATEGORY_BROWSE: { label: "Category Browse", color: "#A9DFBF" },
-    PRODUCT_PAGE: { label: "Product Page", color: "#F59E0B" },
-    BANNER: { label: "Banner", color: "#3498DB" },
-    OTHER: { label: "Others", color: "#E5E8E8" },
-  };
-
-  const leadsForSource = await prisma.shopLead.findMany({
-    select: { source: true },
-  });
-  const totalLeads = leadsForSource.length;
+  // Leads by source, from the groupBy result.
   const sourceCounts = {};
-  for (const l of leadsForSource) {
-    sourceCounts[l.source] = (sourceCounts[l.source] || 0) + 1;
-  }
-
+  leadsBySourceGroups.forEach((g) => {
+    sourceCounts[g.source] = g._count._all;
+  });
   const leadsBySource = Object.keys(sourceMetadata).map((key) => {
     const count = sourceCounts[key] || 0;
-    const percent = totalLeads > 0 ? parseFloat(((count / totalLeads) * 100).toFixed(1)) : 0.0;
+    const percent = totalLeadsCount > 0 ? parseFloat(((count / totalLeadsCount) * 100).toFixed(1)) : 0.0;
     return {
       source: sourceMetadata[key].label,
       percent,
@@ -262,12 +259,6 @@ async function getDashboardSummary() {
   });
 
   // Recent Activity from AuditLog
-  const logs = await prisma.auditLog.findMany({
-    take: 5,
-    orderBy: { createdAt: "desc" },
-    include: { actor: true },
-  });
-
   const recentActivity = logs.map((log) => {
     let type = "other";
     let title = "Action performed";
@@ -1142,7 +1133,7 @@ async function deleteBanner(bannerId, actorContext) {
 
 async function getBannerMetrics() {
   const prisma = getPrisma();
-  
+
   const [
     totalBanners,
     activeBanners,
@@ -1196,24 +1187,31 @@ async function getBannerMetrics() {
 
 async function getBannerPerformance() {
   const prisma = getPrisma();
-  
+
   const sections = ["TOP_HERO", "TOP_CAROUSEL", "MIDDLE_BANNER", "BOTTOM_BANNER"];
+
+  // These 4 aggregates are independent — previously a sequential
+  // for-loop (4 round-trips), now a single parallel batch.
+  const aggregates = await Promise.all(
+    sections.map((sec) =>
+      prisma.banner.aggregate({
+        where: { section: sec, deletedAt: null },
+        _sum: {
+          views: true,
+          clicks: true,
+        },
+      })
+    )
+  );
+
   const performance = {};
-
-  for (const sec of sections) {
-    const agg = await prisma.banner.aggregate({
-      where: { section: sec, deletedAt: null },
-      _sum: {
-        views: true,
-        clicks: true,
-      },
-    });
-
+  sections.forEach((sec, i) => {
+    const agg = aggregates[i];
     performance[sec.toLowerCase()] = {
       views: agg._sum.views || 0,
       clicks: agg._sum.clicks || 0,
     };
-  }
+  });
 
   return performance;
 }

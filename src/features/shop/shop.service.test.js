@@ -4,6 +4,7 @@ const shopService = require("./shop.service");
 const mockPrisma = {
   shop: {
     findFirst: jest.fn(),
+    findUnique: jest.fn(),
     update: jest.fn(),
   },
   product: {
@@ -81,6 +82,7 @@ describe("ShopService", () => {
   describe("getPublicShop", () => {
     it("should return public active shop details with stats", async () => {
       mockPrisma.shop.findFirst.mockResolvedValue(mockShop);
+      mockPrisma.shop.findUnique.mockResolvedValue(mockShop);
       mockPrisma.shop.update.mockResolvedValue(mockShop);
       mockPrisma.product.count.mockResolvedValue(20);
       mockPrisma.review.count.mockResolvedValue(10);

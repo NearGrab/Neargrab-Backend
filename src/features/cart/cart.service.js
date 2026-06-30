@@ -2,24 +2,29 @@ const { getPrisma } = require("../../config/prisma");
 const { AppError, ERROR_CODES } = require("../../lib/errors");
 const { mapCart } = require("./cart.mapper");
 
-/**
- * Gets or creates the active cart for the user.
- */
-async function getOrCreateCartInternal(userId, tx = null) {
-  const client = tx || getPrisma();
-  let cart = await client.cart.findUnique({
-    where: { userId },
+const CART_DETAIL_INCLUDE = {
+  items: {
     include: {
-      items: {
+      product: {
         include: {
-          product: {
-            include: {
-              shop: true,
-            },
-          },
+          shop: true,
         },
       },
     },
+  },
+};
+
+/**
+ * Lightweight get-or-create: only resolves the cart id (and userId),
+ * without pulling the full items/product/shop graph. Use this for
+ * mutations where you just need the cartId to write against.
+ */
+async function getOrCreateCartId(userId, tx = null) {
+  const client = tx || getPrisma();
+
+  let cart = await client.cart.findUnique({
+    where: { userId },
+    select: { id: true },
   });
 
   if (!cart) {
@@ -28,17 +33,31 @@ async function getOrCreateCartInternal(userId, tx = null) {
         userId,
         status: "active",
       },
-      include: {
-        items: {
-          include: {
-            product: {
-              include: {
-                shop: true,
-              },
-            },
-          },
-        },
+      select: { id: true },
+    });
+  }
+
+  return cart;
+}
+
+/**
+ * Heavy fetch: full cart detail with items/product/shop, for responses only.
+ */
+async function getCartDetail(userId, tx = null) {
+  const client = tx || getPrisma();
+
+  let cart = await client.cart.findUnique({
+    where: { userId },
+    include: CART_DETAIL_INCLUDE,
+  });
+
+  if (!cart) {
+    cart = await client.cart.create({
+      data: {
+        userId,
+        status: "active",
       },
+      include: CART_DETAIL_INCLUDE,
     });
   }
 
@@ -46,7 +65,7 @@ async function getOrCreateCartInternal(userId, tx = null) {
 }
 
 async function getCart(userId) {
-  const cart = await getOrCreateCartInternal(userId);
+  const cart = await getCartDetail(userId);
   return mapCart(cart);
 }
 
@@ -56,24 +75,28 @@ async function getCart(userId) {
 async function addToCart(userId, { productId, quantity }) {
   const prisma = getPrisma();
 
-  const product = await prisma.product.findFirst({
-    where: {
-      id: productId,
-      status: "ACTIVE",
-      deletedAt: null,
-    },
-    include: {
-      shop: true,
-      images: {
-        orderBy: {
-          sortOrder: "asc",
-        },
-        include: {
-          media: true,
+  // Independent lookups — run in parallel.
+  const [product, cart] = await Promise.all([
+    prisma.product.findFirst({
+      where: {
+        id: productId,
+        status: "ACTIVE",
+        deletedAt: null,
+      },
+      include: {
+        shop: true,
+        images: {
+          orderBy: {
+            sortOrder: "asc",
+          },
+          include: {
+            media: true,
+          },
         },
       },
-    },
-  });
+    }),
+    getOrCreateCartId(userId),
+  ]);
 
   if (!product) {
     throw new AppError({
@@ -99,9 +122,12 @@ async function addToCart(userId, { productId, quantity }) {
     });
   }
 
-  const cart = await getOrCreateCartInternal(userId);
-
-  const existingItem = cart.items.find((item) => item.productId === productId);
+  // Targeted lookup for just this product's existing line item, instead of
+  // loading the whole cart's items + nested product/shop graph.
+  const existingItem = await prisma.cartItem.findFirst({
+    where: { cartId: cart.id, productId },
+    select: { id: true, quantity: true },
+  });
 
   if (existingItem) {
     const newQuantity = existingItem.quantity + quantity;
@@ -136,8 +162,7 @@ async function addToCart(userId, { productId, quantity }) {
     });
   }
 
-  // Reload cart
-  const updatedCart = await getOrCreateCartInternal(userId);
+  const updatedCart = await getCartDetail(userId);
   return mapCart(updatedCart);
 }
 
@@ -146,9 +171,13 @@ async function addToCart(userId, { productId, quantity }) {
  */
 async function updateCartItem(userId, itemId, { quantity }) {
   const prisma = getPrisma();
-  const cart = await getOrCreateCartInternal(userId);
 
-  const item = cart.items.find((i) => i.id === itemId);
+  // Single query: existence + ownership check together, no full cart load.
+  const item = await prisma.cartItem.findFirst({
+    where: { id: itemId, cart: { userId } },
+    select: { id: true },
+  });
+
   if (!item) {
     throw new AppError({
       statusCode: 404,
@@ -162,7 +191,7 @@ async function updateCartItem(userId, itemId, { quantity }) {
     data: { quantity },
   });
 
-  const updatedCart = await getOrCreateCartInternal(userId);
+  const updatedCart = await getCartDetail(userId);
   return mapCart(updatedCart);
 }
 
@@ -171,9 +200,12 @@ async function updateCartItem(userId, itemId, { quantity }) {
  */
 async function removeCartItem(userId, itemId) {
   const prisma = getPrisma();
-  const cart = await getOrCreateCartInternal(userId);
 
-  const item = cart.items.find((i) => i.id === itemId);
+  const item = await prisma.cartItem.findFirst({
+    where: { id: itemId, cart: { userId } },
+    select: { id: true },
+  });
+
   if (!item) {
     throw new AppError({
       statusCode: 404,
@@ -186,7 +218,7 @@ async function removeCartItem(userId, itemId) {
     where: { id: itemId },
   });
 
-  const updatedCart = await getOrCreateCartInternal(userId);
+  const updatedCart = await getCartDetail(userId);
   return mapCart(updatedCart);
 }
 
@@ -195,13 +227,13 @@ async function removeCartItem(userId, itemId) {
  */
 async function clearCart(userId) {
   const prisma = getPrisma();
-  const cart = await getOrCreateCartInternal(userId);
+  const cart = await getOrCreateCartId(userId);
 
   await prisma.cartItem.deleteMany({
     where: { cartId: cart.id },
   });
 
-  const updatedCart = await getOrCreateCartInternal(userId);
+  const updatedCart = await getCartDetail(userId);
   return mapCart(updatedCart);
 }
 

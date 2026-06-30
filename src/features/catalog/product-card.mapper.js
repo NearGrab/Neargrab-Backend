@@ -67,6 +67,20 @@ function mapShopSummary(shop, options = {}) {
     distanceKm: distanceKm !== undefined && distanceKm !== null ? Number(Number(distanceKm).toFixed(2)) : null,
     ratingAvg: toNum(shop.ratingAvg) || 0,
     reviewCount: shop.ratingCount || 0,
+    logoUrl: shop.logo?.url || null,
+    coverUrl: shop.cover?.url || null,
+    categoryName: shop.category?.name || null,
+    tags: shop.tags?.map((t) => t.tag) || [],
+    address: shop.address ? {
+      id: shop.address.id,
+      street: shop.address.street,
+      landmark: shop.address.landmark,
+      city: shop.address.city,
+      state: shop.address.state,
+      pincode: shop.address.pincode,
+      latitude: toNum(shop.address.latitude),
+      longitude: toNum(shop.address.longitude),
+    } : null,
   };
 }
 

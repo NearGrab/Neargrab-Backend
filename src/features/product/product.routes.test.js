@@ -28,6 +28,7 @@ const mockPrisma = {
     create: jest.fn(),
     aggregate: jest.fn(),
     findUnique: jest.fn(),
+    groupBy: jest.fn(),
   },
   reviewMedia: {
     createMany: jest.fn(),
@@ -94,7 +95,7 @@ describe("Product Feature Routes", () => {
   describe("GET /api/v1/products/:productId", () => {
     it("should return product details successfully", async () => {
       mockPrisma.product.findFirst.mockResolvedValue(mockProduct);
-      mockPrisma.review.findMany.mockResolvedValue([{ rating: 5 }]);
+      mockPrisma.review.groupBy.mockResolvedValue([{ rating: 5, _count: { _all: 1 } }]);
 
       const res = await request(app)
         .get("/api/v1/products/test-product")

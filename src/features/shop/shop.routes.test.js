@@ -6,6 +6,7 @@ const env = require("../../config/env");
 const mockPrisma = {
   shop: {
     findFirst: jest.fn(),
+    findUnique: jest.fn(),
     update: jest.fn(),
   },
   product: {
@@ -101,6 +102,7 @@ describe("Shop Feature Routes", () => {
   describe("GET /api/v1/shops/:shopId", () => {
     it("should return shop profile details successfully", async () => {
       mockPrisma.shop.findFirst.mockResolvedValue(mockShop);
+      mockPrisma.shop.findUnique.mockResolvedValue(mockShop);
       mockPrisma.shop.update.mockResolvedValue(mockShop);
       mockPrisma.product.count.mockResolvedValue(10);
       mockPrisma.review.count.mockResolvedValue(5);

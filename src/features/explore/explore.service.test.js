@@ -144,16 +144,18 @@ describe("ExploreService", () => {
           },
         },
       ]);
-      mockPrisma.review.findMany.mockResolvedValue([
-        {
-          id: "rev-1",
-          rating: 5,
-          comment: "Excellent quality!",
-          createdAt: new Date(),
-          user: { name: "John Doe", avatar: { url: "avatar.jpg" } },
-          shop: { id: "shop-1", name: "Daily Mart" },
-        }
-      ]);
+      mockPrisma.review.findMany
+        .mockResolvedValueOnce([
+          {
+            id: "rev-1",
+            rating: 5,
+            comment: "Excellent quality!",
+            createdAt: new Date(),
+            user: { name: "John Doe", avatar: { url: "avatar.jpg" } },
+            shop: { id: "shop-1", name: "Daily Mart" },
+          }
+        ])
+        .mockResolvedValueOnce([]);
 
       const feed = await exploreService.getExploreFeed({
         city: "Navsari",

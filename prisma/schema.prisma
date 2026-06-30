@@ -309,6 +309,7 @@ model Shop {
 
   @@index([status, verificationStatus])
   @@index([categoryId])
+  @@index([status, deletedAt, city])
 }
 
 model ShopAddress {
@@ -451,6 +452,7 @@ model Category {
 
   @@index([name])
   @@index([status])
+  @@index([parentId, status, deletedAt])
 }
 
 model Brand {
@@ -519,6 +521,8 @@ model Product {
   @@index([categoryId])
   @@index([brandId])
   @@index([isPinned])
+  @@index([status, deletedAt, isPinned, ratingAvg, reviewCount])
+  @@index([createdAt])
 }
 
 model ProductImage {
@@ -673,6 +677,7 @@ model Review {
 
   @@index([productId, status])
   @@index([shopId, status])
+  @@index([status, deletedAt, rating, createdAt])
 }
 
 model ReviewMedia {
@@ -775,6 +780,7 @@ model Banner {
   impressions BannerImpression[]
 
   @@index([city, section, status, startAt, endAt])
+  @@index([status, deletedAt, city, startAt, endAt])
 }
 
 model PinRule {
@@ -825,6 +831,7 @@ model AuditLog {
 
   @@index([actorId, createdAt])
   @@index([entityType, entityId])
+  @@index([createdAt])
 }
 
 model SearchEvent {

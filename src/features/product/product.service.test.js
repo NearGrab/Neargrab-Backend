@@ -20,6 +20,7 @@ const mockPrisma = {
     create: jest.fn(),
     aggregate: jest.fn(),
     findUnique: jest.fn(),
+    groupBy: jest.fn(),
   },
   reviewMedia: {
     createMany: jest.fn(),
@@ -75,6 +76,10 @@ describe("ProductService", () => {
 
       mockPrisma.product.findFirst.mockResolvedValue(mockProduct);
       mockPrisma.savedProduct.findUnique.mockResolvedValue({ userId: "user-123", productId: "prod-1" });
+      mockPrisma.review.groupBy.mockResolvedValue([
+        { rating: 5, _count: { _all: 1 } },
+        { rating: 3, _count: { _all: 1 } },
+      ]);
       mockPrisma.review.findMany.mockResolvedValue([{ rating: 5 }, { rating: 3 }]);
 
       const result = await productService.getProductDetail("test-product", dummyUser);

@@ -7,6 +7,7 @@ const mockPrisma = {
     create: jest.fn(),
   },
   cartItem: {
+    findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
@@ -67,6 +68,7 @@ describe("CartService", () => {
       };
 
       mockPrisma.product.findFirst.mockResolvedValue(mockProduct);
+      mockPrisma.cartItem.findFirst.mockResolvedValue(null);
       mockPrisma.cart.findUnique.mockResolvedValue({
         id: "cart-1",
         status: "active",
@@ -109,6 +111,7 @@ describe("CartService", () => {
       };
 
       mockPrisma.product.findFirst.mockResolvedValue(mockProduct);
+      mockPrisma.cartItem.findFirst.mockResolvedValue({ id: "item-1", quantity: 3 });
       mockPrisma.cart.findUnique.mockResolvedValue({
         id: "cart-1",
         status: "active",
@@ -158,6 +161,7 @@ describe("CartService", () => {
 
   describe("updateCartItem", () => {
     it("should update quantity of an item", async () => {
+      mockPrisma.cartItem.findFirst.mockResolvedValue({ id: "item-1" });
       mockPrisma.cart.findUnique.mockResolvedValue({
         id: "cart-1",
         status: "active",
@@ -182,6 +186,7 @@ describe("CartService", () => {
 
   describe("removeCartItem", () => {
     it("should remove item from cart", async () => {
+      mockPrisma.cartItem.findFirst.mockResolvedValue({ id: "item-1" });
       mockPrisma.cart.findUnique.mockResolvedValue({
         id: "cart-1",
         status: "active",

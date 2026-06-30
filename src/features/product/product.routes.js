@@ -10,7 +10,10 @@ const router = express.Router();
 router.get(
   "/:productId",
   optionalAuth,
-  validate({ params: productSchema.productIdParam }),
+  validate({
+    params: productSchema.productIdParam,
+    query: productSchema.productQuery,
+  }),
   productController.getProductDetail
 );
 

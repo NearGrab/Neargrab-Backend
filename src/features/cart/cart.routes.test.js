@@ -8,6 +8,7 @@ const mockPrisma = {
     create: jest.fn(),
   },
   cartItem: {
+    findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
@@ -102,6 +103,7 @@ describe("Cart Feature Routes", () => {
       };
 
       mockPrisma.product.findFirst.mockResolvedValue(mockProduct);
+      mockPrisma.cartItem.findFirst.mockResolvedValue(null);
       mockPrisma.cart.findUnique.mockResolvedValue({
         id: "cart-1",
         status: "active",
@@ -129,6 +131,7 @@ describe("Cart Feature Routes", () => {
 
   describe("PATCH /api/v1/cart/items/:itemId", () => {
     it("should update quantity successfully", async () => {
+      mockPrisma.cartItem.findFirst.mockResolvedValue({ id: "item-1" });
       mockPrisma.cart.findUnique.mockResolvedValue({
         id: "cart-1",
         status: "active",
@@ -154,6 +157,7 @@ describe("Cart Feature Routes", () => {
 
   describe("DELETE /api/v1/cart/items/:itemId", () => {
     it("should delete item successfully", async () => {
+      mockPrisma.cartItem.findFirst.mockResolvedValue({ id: "item-1" });
       mockPrisma.cart.findUnique.mockResolvedValue({
         id: "cart-1",
         status: "active",

@@ -6,7 +6,8 @@ async function getProductDetail(req, res, next) {
   try {
     const data = await productService.getProductDetail(
       req.params.productId,
-      req.user
+      req.user,
+      req.query
     );
     return sendSuccess(res, data);
   } catch (error) {

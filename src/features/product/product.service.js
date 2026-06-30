@@ -10,25 +10,58 @@ const {
   mapReview,
 } = require("./product.mapper");
 
+const PRODUCT_REF_WHERE = (productIdOrSlug) => ({
+  OR: [{ id: productIdOrSlug }, { slug: productIdOrSlug }],
+  status: "ACTIVE",
+  deletedAt: null,
+  shop: {
+    status: "ACTIVE",
+    deletedAt: null,
+  },
+});
+
+/**
+ * Shared lightweight product lookup. Callers pass only the fields they
+ * actually need via `select`, instead of every call site pulling the
+ * full product row (which most mutation/analytics endpoints never use).
+ */
+async function getActiveProductRef(productIdOrSlug, select = { id: true, shopId: true }) {
+  const prisma = getPrisma();
+  const product = await prisma.product.findFirst({
+    where: PRODUCT_REF_WHERE(productIdOrSlug),
+    select,
+  });
+
+  if (!product) {
+    throw new AppError({
+      statusCode: 404,
+      code: ERROR_CODES.PRODUCT_NOT_FOUND,
+      message: "Product not found or inactive",
+    });
+  }
+
+  return product;
+}
+
+/**
+ * Cap on how many raw candidate rows we'll pull for in-memory scoring in
+ * getAvailableStores / getSimilarProducts. Without a cap, these queries
+ * fetch every matching product (with heavy joins) across the whole
+ * city/category, which is the single biggest cost on this page as the
+ * catalog grows. We bias the DB-side query toward the most likely-relevant
+ * rows (highest rated) before truncating, trading a small amount of
+ * theoretical recall for a big, predictable latency ceiling.
+ */
+const CANDIDATE_FETCH_CAP = 200;
+
 /**
  * Fetch product detail with images, specs, badges, and review counts.
  */
-async function getProductDetail(productIdOrSlug, user) {
+async function getProductDetail(productIdOrSlug, user, query = {}) {
   const prisma = getPrisma();
 
   const product = await prisma.product.findFirst({
-    where: {
-      OR: [
-        { id: productIdOrSlug },
-        { slug: productIdOrSlug },
-      ],
-      status: "ACTIVE",
-      deletedAt: null,
-      shop: {
-        status: "ACTIVE",
-        deletedAt: null,
-      },
-    },
+    where: PRODUCT_REF_WHERE(productIdOrSlug),
     include: {
       images: { include: { media: true } },
       attributes: true,
@@ -50,40 +83,56 @@ async function getProductDetail(productIdOrSlug, user) {
     });
   }
 
-  let isSaved = false;
-  if (user) {
-    const saved = await prisma.savedProduct.findUnique({
-      where: {
-        userId_productId: {
-          userId: user.id,
-          productId: product.id,
-        },
-      },
-    });
-    isSaved = !!saved;
+  // Calculate distance if coordinates are passed
+  let distanceKm = null;
+  if (query.latitude && query.longitude && product.shop?.address?.latitude && product.shop?.address?.longitude) {
+    distanceKm = calculateDistance(
+      Number(query.latitude),
+      Number(query.longitude),
+      Number(product.shop.address.latitude),
+      Number(product.shop.address.longitude)
+    );
   }
 
-  // Calculate review summary breakdown
-  const reviews = await prisma.review.findMany({
-    where: {
-      productId: product.id,
-      status: "PUBLISHED",
-    },
-    select: {
-      rating: true,
-    },
-  });
+  // isSaved check and review breakdown are independent of each other —
+  // run them in parallel instead of sequentially.
+  const [savedRecord, ratingGroups] = await Promise.all([
+    user
+      ? prisma.savedProduct.findUnique({
+          where: {
+            userId_productId: {
+              userId: user.id,
+              productId: product.id,
+            },
+          },
+          select: { userId: true },
+        })
+      : Promise.resolve(null),
+    // DB-side aggregation instead of pulling every review row into Node
+    // just to count by rating bucket.
+    prisma.review.groupBy({
+      by: ["rating"],
+      where: {
+        productId: product.id,
+        status: "PUBLISHED",
+      },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const isSaved = !!savedRecord;
 
   const breakdown = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-  reviews.forEach((r) => {
-    if (breakdown[r.rating] !== undefined) {
-      breakdown[r.rating]++;
+  ratingGroups.forEach((g) => {
+    if (breakdown[g.rating] !== undefined) {
+      breakdown[g.rating] = g._count._all;
     }
   });
 
   return mapProductDetail(product, {
     isSaved,
     reviewBreakdown: breakdown,
+    distanceKm,
   });
 }
 
@@ -93,28 +142,13 @@ async function getProductDetail(productIdOrSlug, user) {
 async function getAvailableStores(productIdOrSlug, filters) {
   const prisma = getPrisma();
 
-  const refProduct = await prisma.product.findFirst({
-    where: {
-      OR: [
-        { id: productIdOrSlug },
-        { slug: productIdOrSlug },
-      ],
-      status: "ACTIVE",
-      deletedAt: null,
-      shop: {
-        status: "ACTIVE",
-        deletedAt: null,
-      },
-    },
+  const refProduct = await getActiveProductRef(productIdOrSlug, {
+    id: true,
+    shopId: true,
+    brandId: true,
+    categoryId: true,
+    name: true,
   });
-
-  if (!refProduct) {
-    throw new AppError({
-      statusCode: 404,
-      code: ERROR_CODES.PRODUCT_NOT_FOUND,
-      message: "Product not found or inactive",
-    });
-  }
 
   const { city, latitude, longitude, radiusKm, page, limit } = filters;
   const hasLocation = false; // Bypass GPS coordinates in MVP
@@ -147,8 +181,13 @@ async function getAvailableStores(productIdOrSlug, filters) {
     ],
   };
 
+  // Capped + pre-sorted at the DB level instead of pulling every matching
+  // row unbounded. We bias toward higher-rated / more-recent products
+  // since those are most likely to end up in the final paginated result.
   const candidates = await prisma.product.findMany({
     where: productWhere,
+    orderBy: [{ ratingAvg: "desc" }, { createdAt: "desc" }],
+    take: CANDIDATE_FETCH_CAP,
     include: {
       shop: {
         include: {
@@ -235,31 +274,13 @@ async function getAvailableStores(productIdOrSlug, filters) {
  * Returns similar active products in same category/brand.
  */
 async function getSimilarProducts(productIdOrSlug, filters) {
-  const prisma = getPrisma();
-
-  const refProduct = await prisma.product.findFirst({
-    where: {
-      OR: [
-        { id: productIdOrSlug },
-        { slug: productIdOrSlug },
-      ],
-      status: "ACTIVE",
-      deletedAt: null,
-      shop: {
-        status: "ACTIVE",
-        deletedAt: null,
-      },
-    },
+  const refProduct = await getActiveProductRef(productIdOrSlug, {
+    id: true,
+    brandId: true,
+    categoryId: true,
   });
 
-  if (!refProduct) {
-    throw new AppError({
-      statusCode: 404,
-      code: ERROR_CODES.PRODUCT_NOT_FOUND,
-      message: "Product not found or inactive",
-    });
-  }
-
+  const prisma = getPrisma();
   const { city, limit = 10 } = filters;
 
   const where = {
@@ -277,8 +298,13 @@ async function getSimilarProducts(productIdOrSlug, filters) {
     ],
   };
 
+  // Capped + pre-sorted by rating at the DB level — we only ever return
+  // `limit` (default 10) items, so there's no reason to pull an unbounded
+  // candidate set into memory just to re-sort it in JS.
   const candidates = await prisma.product.findMany({
     where,
+    orderBy: { ratingAvg: "desc" },
+    take: CANDIDATE_FETCH_CAP,
     include: {
       images: { include: { media: true } },
       category: true,
@@ -308,29 +334,7 @@ async function getSimilarProducts(productIdOrSlug, filters) {
  */
 async function listProductReviews(productIdOrSlug, filters) {
   const prisma = getPrisma();
-
-  const product = await prisma.product.findFirst({
-    where: {
-      OR: [
-        { id: productIdOrSlug },
-        { slug: productIdOrSlug },
-      ],
-      status: "ACTIVE",
-      deletedAt: null,
-      shop: {
-        status: "ACTIVE",
-        deletedAt: null,
-      },
-    },
-  });
-
-  if (!product) {
-    throw new AppError({
-      statusCode: 404,
-      code: ERROR_CODES.PRODUCT_NOT_FOUND,
-      message: "Product not found or inactive",
-    });
-  }
+  const product = await getActiveProductRef(productIdOrSlug);
 
   const { page = 1, limit = 20, rating, sort = "newest" } = filters;
 
@@ -387,29 +391,7 @@ async function listProductReviews(productIdOrSlug, filters) {
  */
 async function createProductReview(productIdOrSlug, input, user) {
   const prisma = getPrisma();
-
-  const product = await prisma.product.findFirst({
-    where: {
-      OR: [
-        { id: productIdOrSlug },
-        { slug: productIdOrSlug },
-      ],
-      status: "ACTIVE",
-      deletedAt: null,
-      shop: {
-        status: "ACTIVE",
-        deletedAt: null,
-      },
-    },
-  });
-
-  if (!product) {
-    throw new AppError({
-      statusCode: 404,
-      code: ERROR_CODES.PRODUCT_NOT_FOUND,
-      message: "Product not found or inactive",
-    });
-  }
+  const product = await getActiveProductRef(productIdOrSlug, { id: true, shopId: true });
 
   // Prevent duplicate reviews
   const existingReview = await prisma.review.findFirst({
@@ -418,6 +400,7 @@ async function createProductReview(productIdOrSlug, input, user) {
       productId: product.id,
       status: { not: "DELETED" },
     },
+    select: { id: true },
   });
 
   if (existingReview) {
@@ -430,69 +413,74 @@ async function createProductReview(productIdOrSlug, input, user) {
 
   const { rating, comment, reservationId, mediaIds = [] } = input;
 
-  if (mediaIds && mediaIds.length > 0) {
-    const assets = await prisma.mediaAsset.findMany({
-      where: { id: { in: mediaIds } },
-    });
-    if (assets.length !== mediaIds.length) {
-      throw new AppError({
-        statusCode: 404,
-        code: ERROR_CODES.MEDIA_NOT_FOUND,
-        message: "Some media assets were not found",
+  // Media ownership validation and purchase verification are independent
+  // of each other — run them in parallel.
+  const [, verifiedPurchase] = await Promise.all([
+    (async () => {
+      if (!mediaIds || mediaIds.length === 0) return;
+      const assets = await prisma.mediaAsset.findMany({
+        where: { id: { in: mediaIds } },
+        select: { id: true, ownerId: true },
       });
-    }
-    for (const asset of assets) {
-      if (asset.ownerId && asset.ownerId !== user.id) {
+      if (assets.length !== mediaIds.length) {
         throw new AppError({
-          statusCode: 403,
-          code: ERROR_CODES.MEDIA_FORBIDDEN,
-          message: "You do not own this media asset",
+          statusCode: 404,
+          code: ERROR_CODES.MEDIA_NOT_FOUND,
+          message: "Some media assets were not found",
         });
       }
-    }
-  }
+      for (const asset of assets) {
+        if (asset.ownerId && asset.ownerId !== user.id) {
+          throw new AppError({
+            statusCode: 403,
+            code: ERROR_CODES.MEDIA_FORBIDDEN,
+            message: "You do not own this media asset",
+          });
+        }
+      }
+    })(),
+    (async () => {
+      if (reservationId) {
+        const reservation = await prisma.reservation.findFirst({
+          where: {
+            id: reservationId,
+            userId: user.id,
+            items: {
+              some: {
+                productId: product.id,
+              },
+            },
+          },
+          select: { id: true },
+        });
 
-  let verifiedPurchase = false;
+        if (!reservation) {
+          throw new AppError({
+            statusCode: 400,
+            code: ERROR_CODES.INVALID_REVIEW_TARGET,
+            message: "Invalid reservation specified for product review",
+          });
+        }
 
-  if (reservationId) {
-    const reservation = await prisma.reservation.findFirst({
-      where: {
-        id: reservationId,
-        userId: user.id,
-        items: {
-          some: {
-            productId: product.id,
+        return true;
+      }
+
+      const pastReservation = await prisma.reservation.findFirst({
+        where: {
+          userId: user.id,
+          status: { in: ["COMPLETED", "ACCEPTED"] },
+          items: {
+            some: {
+              productId: product.id,
+            },
           },
         },
-      },
-    });
-
-    if (!reservation) {
-      throw new AppError({
-        statusCode: 400,
-        code: ERROR_CODES.INVALID_REVIEW_TARGET,
-        message: "Invalid reservation specified for product review",
+        select: { id: true },
       });
-    }
 
-    verifiedPurchase = true;
-  } else {
-    // Check if customer had any completed reservation with this product
-    const pastReservation = await prisma.reservation.findFirst({
-      where: {
-        userId: user.id,
-        status: { in: ["COMPLETED", "ACCEPTED"] },
-        items: {
-          some: {
-            productId: product.id,
-          },
-        },
-      },
-    });
-    if (pastReservation) {
-      verifiedPurchase = true;
-    }
-  }
+      return !!pastReservation;
+    })(),
+  ]);
 
   const newReview = await runInTransaction(async (tx) => {
     const review = await tx.review.create({
@@ -559,29 +547,7 @@ async function createProductReview(productIdOrSlug, input, user) {
  */
 async function saveProduct(productIdOrSlug, user) {
   const prisma = getPrisma();
-
-  const product = await prisma.product.findFirst({
-    where: {
-      OR: [
-        { id: productIdOrSlug },
-        { slug: productIdOrSlug },
-      ],
-      status: "ACTIVE",
-      deletedAt: null,
-      shop: {
-        status: "ACTIVE",
-        deletedAt: null,
-      },
-    },
-  });
-
-  if (!product) {
-    throw new AppError({
-      statusCode: 404,
-      code: ERROR_CODES.PRODUCT_NOT_FOUND,
-      message: "Product not found or inactive",
-    });
-  }
+  const product = await getActiveProductRef(productIdOrSlug);
 
   await prisma.savedProduct.upsert({
     where: {
@@ -605,29 +571,7 @@ async function saveProduct(productIdOrSlug, user) {
  */
 async function unsaveProduct(productIdOrSlug, user) {
   const prisma = getPrisma();
-
-  const product = await prisma.product.findFirst({
-    where: {
-      OR: [
-        { id: productIdOrSlug },
-        { slug: productIdOrSlug },
-      ],
-      status: "ACTIVE",
-      deletedAt: null,
-      shop: {
-        status: "ACTIVE",
-        deletedAt: null,
-      },
-    },
-  });
-
-  if (!product) {
-    throw new AppError({
-      statusCode: 404,
-      code: ERROR_CODES.PRODUCT_NOT_FOUND,
-      message: "Product not found or inactive",
-    });
-  }
+  const product = await getActiveProductRef(productIdOrSlug);
 
   try {
     await prisma.savedProduct.delete({
@@ -652,29 +596,7 @@ async function unsaveProduct(productIdOrSlug, user) {
  */
 async function trackProductView(productIdOrSlug, input, user) {
   const prisma = getPrisma();
-
-  const product = await prisma.product.findFirst({
-    where: {
-      OR: [
-        { id: productIdOrSlug },
-        { slug: productIdOrSlug },
-      ],
-      status: "ACTIVE",
-      deletedAt: null,
-      shop: {
-        status: "ACTIVE",
-        deletedAt: null,
-      },
-    },
-  });
-
-  if (!product) {
-    throw new AppError({
-      statusCode: 404,
-      code: ERROR_CODES.PRODUCT_NOT_FOUND,
-      message: "Product not found or inactive",
-    });
-  }
+  const product = await getActiveProductRef(productIdOrSlug, { id: true, shopId: true });
 
   const { source, shopId } = input;
 
@@ -712,29 +634,7 @@ async function trackProductView(productIdOrSlug, input, user) {
  */
 async function createProductFeedback(productIdOrSlug, input, user) {
   const prisma = getPrisma();
-
-  const product = await prisma.product.findFirst({
-    where: {
-      OR: [
-        { id: productIdOrSlug },
-        { slug: productIdOrSlug },
-      ],
-      status: "ACTIVE",
-      deletedAt: null,
-      shop: {
-        status: "ACTIVE",
-        deletedAt: null,
-      },
-    },
-  });
-
-  if (!product) {
-    throw new AppError({
-      statusCode: 404,
-      code: ERROR_CODES.PRODUCT_NOT_FOUND,
-      message: "Product not found or inactive",
-    });
-  }
+  const product = await getActiveProductRef(productIdOrSlug);
 
   const { type, subject, message, metadata = {} } = input;
   const mergedMetadata = {
@@ -778,29 +678,7 @@ if (cleanupInterval && typeof cleanupInterval.unref === 'function') {
  */
 async function trackProductClick(productIdOrSlug, ipAddress, userId) {
   const prisma = getPrisma();
-
-  const product = await prisma.product.findFirst({
-    where: {
-      OR: [
-        { id: productIdOrSlug },
-        { slug: productIdOrSlug },
-      ],
-      status: "ACTIVE",
-      deletedAt: null,
-      shop: {
-        status: "ACTIVE",
-        deletedAt: null,
-      },
-    },
-  });
-
-  if (!product) {
-    throw new AppError({
-      statusCode: 404,
-      code: ERROR_CODES.PRODUCT_NOT_FOUND,
-      message: "Product not found or inactive",
-    });
-  }
+  const product = await getActiveProductRef(productIdOrSlug);
 
   const userKey = userId || ipAddress || "anonymous";
   const cacheKey = `${userKey}:${product.id}`;

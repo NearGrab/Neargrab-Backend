@@ -6,7 +6,10 @@ const { createNotification } = require("../notification/notification.service");
 const crypto = require("crypto");
 
 /**
- * Fetch the shop owned by the user and throw error if not found.
+ * Fetch the FULL shop (with all profile relations) owned by the user.
+ * Use only for endpoints that actually return the full shop object
+ * (dashboard, profile get/update, timings). Everything else should use
+ * getShopkeeperShopRef below.
  */
 async function getShopkeeperShop(userId) {
   const prisma = getPrisma();
@@ -22,6 +25,29 @@ async function getShopkeeperShop(userId) {
       languages: true,
       tags: true,
     },
+  });
+
+  if (!shop || shop.status === "DRAFT") {
+    throw new AppError({
+      statusCode: 404,
+      code: ERROR_CODES.SHOP_NOT_FOUND,
+      message: "Active or pending shop profile not found for this user",
+    });
+  }
+
+  return shop;
+}
+
+/**
+ * Lightweight shop lookup for endpoints that only need shop.id (and
+ * occasionally one or two extra fields) — avoids the 8-relation join that
+ * getShopkeeperShop performs, which most call sites in this file never use.
+ */
+async function getShopkeeperShopRef(userId, select = {}) {
+  const prisma = getPrisma();
+  const shop = await prisma.shop.findUnique({
+    where: { ownerId: userId },
+    select: { id: true, status: true, ...select },
   });
 
   if (!shop || shop.status === "DRAFT") {
@@ -60,7 +86,11 @@ async function getDashboardStats(userId) {
   const startOfWindow = new Date(datesWindow[0]);
   startOfWindow.setHours(0, 0, 0, 0);
 
-  // Fetch product views, leads, and saves within 14 days window along with overall stats
+  // Fetch product views, leads, and saves within 14 days window along with overall stats.
+  // NOTE: productViews/leads/savedProducts only need createdAt (+ metadata/source for
+  // leads) for the day-bucketing logic below — selecting just those columns instead of
+  // full rows (and dropping the unused `product` include on savedProducts) cuts the
+  // payload significantly for shops with high view volume.
   const [
     productViews,
     leads,
@@ -73,16 +103,18 @@ async function getDashboardStats(userId) {
   ] = await Promise.all([
     prisma.productView.findMany({
       where: { shopId: shop.id, createdAt: { gte: startOfWindow } },
+      select: { createdAt: true },
     }),
     prisma.shopLead.findMany({
       where: { shopId: shop.id, createdAt: { gte: startOfWindow } },
+      select: { createdAt: true, metadata: true, source: true },
     }),
     prisma.savedProduct.findMany({
       where: {
         product: { shopId: shop.id },
         createdAt: { gte: startOfWindow },
       },
-      include: { product: true },
+      select: { createdAt: true },
     }),
     prisma.product.findMany({
       where: {
@@ -135,11 +167,15 @@ async function getDashboardStats(userId) {
     return copy.getTime();
   });
 
+  // Use a Map for O(1) day lookups instead of Array.indexOf (O(n) per call,
+  // which matters once productViews/leads volume grows).
+  const dayIndexByTimestamp = new Map(dayTimestamps.map((t, idx) => [t, idx]));
+
   const getDayIndex = (date) => {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
-    const t = d.getTime();
-    return dayTimestamps.indexOf(t);
+    const idx = dayIndexByTimestamp.get(d.getTime());
+    return idx === undefined ? -1 : idx;
   };
 
   productViews.forEach((pv) => {
@@ -154,7 +190,7 @@ async function getDashboardStats(userId) {
     if (idx !== -1) {
       const action = l.metadata?.action || "";
       const source = l.source;
-      
+
       if (action === "SHOP_PROFILE_VIEW" || source === "SHOP_PROFILE") {
         viewsTrend14[idx]++;
       } else if (
@@ -245,39 +281,49 @@ async function getDashboardStats(userId) {
   };
 }
 
+/**
+ * Shared aggregate-stats fetch used by getShopProfile and updateShopProfile.
+ * directionClicks is now a DB-side count filtered on the JSON metadata path
+ * instead of pulling every lead the shop has ever had into Node to filter
+ * in JS — that findMany had no date bound or take limit and was the
+ * single biggest unbounded query in this file for established shops.
+ */
+async function getShopAggregateStats(tx, shop) {
+  const [productCount, reviewCount, followersCount, followingCount, directionClicks] =
+    await Promise.all([
+      tx.product.count({
+        where: { shopId: shop.id, status: "ACTIVE", deletedAt: null },
+      }),
+      tx.review.count({
+        where: { shopId: shop.id, status: "PUBLISHED" },
+      }),
+      tx.userFollow.count({
+        where: { followingId: shop.ownerId },
+      }),
+      tx.userFollow.count({
+        where: { followerId: shop.ownerId },
+      }),
+      tx.shopLead.count({
+        where: {
+          shopId: shop.id,
+          metadata: { path: ["action"], equals: "MAP_OPEN" },
+        },
+      }),
+    ]);
+
+  return { productCount, reviewCount, followersCount, followingCount, directionClicks };
+}
+
 async function getShopProfile(userId) {
   const shop = await getShopkeeperShop(userId);
   const prisma = getPrisma();
 
-  const [productCount, reviewCount, followersCount, followingCount, leads] = await Promise.all([
-    prisma.product.count({
-      where: { shopId: shop.id, status: "ACTIVE", deletedAt: null },
-    }),
-    prisma.review.count({
-      where: { shopId: shop.id, status: "PUBLISHED" },
-    }),
-    prisma.userFollow.count({
-      where: { followingId: shop.ownerId },
-    }),
-    prisma.userFollow.count({
-      where: { followerId: shop.ownerId },
-    }),
-    prisma.shopLead.findMany({
-      where: { shopId: shop.id },
-      select: { metadata: true }
-    }),
-  ]);
-
-  const directionClicks = leads.filter(l => l.metadata?.action === 'MAP_OPEN').length;
+  const stats = await getShopAggregateStats(prisma, shop);
 
   return {
     ...shop,
     stats: {
-      productCount,
-      reviewCount,
-      followersCount,
-      followingCount,
-      directionClicks,
+      ...stats,
       viewCount: shop.viewCount || 0,
     },
   };
@@ -457,50 +503,29 @@ async function updateShopProfile(userId, input) {
       }
     }
 
-    // Retrieve updated shop profile
-    const updatedShop = await tx.shop.findUnique({
-      where: { id: shop.id },
-      include: {
-        address: true,
-        contact: true,
-        timings: true,
-        logo: true,
-        cover: true,
-        paymentMethods: true,
-        languages: true,
-        tags: true,
-      },
-    });
-
-    const [productCount, reviewCount, followersCount, followingCount, leads] = await Promise.all([
-      tx.product.count({
-        where: { shopId: shop.id, status: "ACTIVE", deletedAt: null },
+    // Retrieve updated shop profile and aggregate stats in parallel —
+    // they're independent reads.
+    const [updatedShop, stats] = await Promise.all([
+      tx.shop.findUnique({
+        where: { id: shop.id },
+        include: {
+          address: true,
+          contact: true,
+          timings: true,
+          logo: true,
+          cover: true,
+          paymentMethods: true,
+          languages: true,
+          tags: true,
+        },
       }),
-      tx.review.count({
-        where: { shopId: shop.id, status: "PUBLISHED" },
-      }),
-      tx.userFollow.count({
-        where: { followingId: shop.ownerId },
-      }),
-      tx.userFollow.count({
-        where: { followerId: shop.ownerId },
-      }),
-      tx.shopLead.findMany({
-        where: { shopId: shop.id },
-        select: { metadata: true }
-      }),
+      getShopAggregateStats(tx, shop),
     ]);
-
-    const directionClicks = leads.filter(l => l.metadata?.action === 'MAP_OPEN').length;
 
     return {
       ...updatedShop,
       stats: {
-        productCount,
-        reviewCount,
-        followersCount,
-        followingCount,
-        directionClicks,
+        ...stats,
         viewCount: updatedShop.viewCount || 0,
       },
     };
@@ -519,8 +544,7 @@ async function getShopTimings(userId) {
  * Replace all shop timings atomically.
  */
 async function replaceShopTimings(userId, timingsArray) {
-  const prisma = getPrisma();
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId);
 
   return await runInTransaction(async (tx) => {
     // Delete existing timings
@@ -551,7 +575,7 @@ async function replaceShopTimings(userId, timingsArray) {
  */
 async function listShopkeeperReviews(userId, filters) {
   const prisma = getPrisma();
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId);
 
   const { rating, page, limit } = filters;
   const skip = (page - 1) * limit;
@@ -589,7 +613,7 @@ async function listShopkeeperReviews(userId, filters) {
  */
 async function listShopkeeperLeads(userId, filters) {
   const prisma = getPrisma();
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId);
 
   const { page, limit } = filters;
   const skip = (page - 1) * limit;
@@ -621,7 +645,7 @@ async function listShopkeeperLeads(userId, filters) {
  */
 async function listShopkeeperReservations(userId, filters) {
   const prisma = getPrisma();
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId);
 
   const { status, page, limit } = filters;
   const skip = (page - 1) * limit;
@@ -664,11 +688,12 @@ async function listShopkeeperReservations(userId, filters) {
  */
 async function updateReservationStatus(userId, reservationId, input) {
   const prisma = getPrisma();
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId, { name: true });
   const { status: nextStatus, shopkeeperNote } = input;
 
   const reservation = await prisma.reservation.findUnique({
     where: { id: reservationId },
+    select: { id: true, shopId: true, userId: true, status: true },
   });
 
   if (!reservation || reservation.shopId !== shop.id) {
@@ -697,7 +722,7 @@ async function updateReservationStatus(userId, reservationId, input) {
     });
   }
 
-  const updated = await runInTransaction(async (tx) => {
+  await runInTransaction(async (tx) => {
     const updateData = { status: nextStatus };
     if (shopkeeperNote !== undefined) updateData.shopkeeperNote = shopkeeperNote;
 
@@ -705,31 +730,31 @@ async function updateReservationStatus(userId, reservationId, input) {
     if (nextStatus === "COMPLETED") updateData.completedAt = new Date();
     if (nextStatus === "CANCELLED") updateData.cancelledAt = new Date();
 
-    const resv = await tx.reservation.update({
+    await tx.reservation.update({
       where: { id: reservationId },
       data: updateData,
     });
 
-    // If reservation is completed/rejected, restore or confirm stock
+    // If reservation is rejected, restore stock holds
     if (nextStatus === "REJECTED") {
-      // Revert items stock reservation holds
       const items = await tx.reservationItem.findMany({
         where: { reservationId },
+        select: { productId: true, quantity: true },
       });
+      // Sequential by necessity — these run inside a single interactive
+      // transaction (one underlying connection), so they cannot be
+      // parallelized with Promise.all.
       for (const item of items) {
         await tx.product.update({
           where: { id: item.productId },
           data: {
             stockCount: { increment: item.quantity },
-            // If it was out of stock, restore status
             stockStatus: "IN_STOCK",
             stockAvailable: true,
           },
         });
       }
     }
-
-    return resv;
   });
 
   // Trigger Notification to Customer
@@ -746,31 +771,36 @@ async function updateReservationStatus(userId, reservationId, input) {
     message = `Your reservation at ${shop.name} has been successfully completed. Thank you!`;
   }
 
-  if (title) {
-    await createNotification({
-      userId: reservation.userId,
-      type: "RESERVATION",
-      title,
-      message,
-      actionUrl: `/reservations/${reservation.id}`,
-    });
-  }
-
-  return await prisma.reservation.findUnique({
-    where: { id: reservationId },
-    include: {
-      user: true,
-      items: {
-        include: {
-          product: {
-            include: {
-              images: { include: { media: true } },
+  // Notification send and the final detail re-fetch are independent —
+  // run them in parallel instead of sequentially.
+  const [, finalReservation] = await Promise.all([
+    title
+      ? createNotification({
+          userId: reservation.userId,
+          type: "RESERVATION",
+          title,
+          message,
+          actionUrl: `/reservations/${reservation.id}`,
+        })
+      : Promise.resolve(null),
+    prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: {
+        user: true,
+        items: {
+          include: {
+            product: {
+              include: {
+                images: { include: { media: true } },
+              },
             },
           },
         },
       },
-    },
-  });
+    }),
+  ]);
+
+  return finalReservation;
 }
 
 /**
@@ -778,7 +808,7 @@ async function updateReservationStatus(userId, reservationId, input) {
  */
 async function listShopkeeperProducts(userId, filters) {
   const prisma = getPrisma();
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId);
 
   const { q, categoryId, stockStatus, page, limit } = filters;
   const skip = (page - 1) * limit;
@@ -833,11 +863,12 @@ async function listShopkeeperProducts(userId, filters) {
  */
 async function createShopProduct(userId, input) {
   const prisma = getPrisma();
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId);
 
   if (input.imageMediaIds && input.imageMediaIds.length > 0) {
     const assets = await prisma.mediaAsset.findMany({
       where: { id: { in: input.imageMediaIds } },
+      select: { id: true, ownerId: true },
     });
     if (assets.length !== input.imageMediaIds.length) {
       throw new AppError({
@@ -885,6 +916,7 @@ async function createShopProduct(userId, input) {
         sku: finalSku,
         status: { not: "DELETED" },
       },
+      select: { id: true },
     });
     if (existing) {
       throw new AppError({
@@ -923,32 +955,42 @@ async function createShopProduct(userId, input) {
       },
     });
 
-    await tx.productAnalytics.create({
-      data: {
-        productId: product.id,
-        totalClicks: 0,
-      },
-    });
+    const tasks = [
+      tx.productAnalytics.create({
+        data: {
+          productId: product.id,
+          totalClicks: 0,
+        },
+      }),
+    ];
 
     if (attributes && attributes.length > 0) {
-      await tx.productAttribute.createMany({
-        data: attributes.map((attr) => ({
-          productId: product.id,
-          key: attr.key,
-          value: attr.value,
-        })),
-      });
+      tasks.push(
+        tx.productAttribute.createMany({
+          data: attributes.map((attr) => ({
+            productId: product.id,
+            key: attr.key,
+            value: attr.value,
+          })),
+        })
+      );
     }
 
     if (imageMediaIds && imageMediaIds.length > 0) {
-      await tx.productImage.createMany({
-        data: imageMediaIds.map((mId, index) => ({
-          productId: product.id,
-          mediaId: mId,
-          sortOrder: index,
-        })),
-      });
+      tasks.push(
+        tx.productImage.createMany({
+          data: imageMediaIds.map((mId, index) => ({
+            productId: product.id,
+            mediaId: mId,
+            sortOrder: index,
+          })),
+        })
+      );
     }
+
+    // These writes touch disjoint tables (productAnalytics, productAttribute,
+    // productImage) keyed off the just-created product — safe to fire together.
+    await Promise.all(tasks);
 
     return await tx.product.findUnique({
       where: { id: product.id },
@@ -967,7 +1009,7 @@ async function createShopProduct(userId, input) {
  */
 async function getShopProductDetail(userId, productId) {
   const prisma = getPrisma();
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId);
 
   const product = await prisma.product.findFirst({
     where: {
@@ -999,37 +1041,44 @@ async function getShopProductDetail(userId, productId) {
  */
 async function updateShopProduct(userId, productId, input) {
   const prisma = getPrisma();
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId);
 
-  if (input.imageMediaIds && input.imageMediaIds.length > 0) {
-    const assets = await prisma.mediaAsset.findMany({
-      where: { id: { in: input.imageMediaIds } },
-    });
-    if (assets.length !== input.imageMediaIds.length) {
-      throw new AppError({
-        statusCode: 404,
-        code: ERROR_CODES.MEDIA_NOT_FOUND,
-        message: "Some media assets were not found",
+  // Media validation and product-ownership lookup are independent —
+  // run them in parallel.
+  const [mediaCheck, product] = await Promise.all([
+    (async () => {
+      if (!input.imageMediaIds || input.imageMediaIds.length === 0) return;
+      const assets = await prisma.mediaAsset.findMany({
+        where: { id: { in: input.imageMediaIds } },
+        select: { id: true, ownerId: true },
       });
-    }
-    for (const asset of assets) {
-      if (asset.ownerId && asset.ownerId !== userId) {
+      if (assets.length !== input.imageMediaIds.length) {
         throw new AppError({
-          statusCode: 403,
-          code: ERROR_CODES.MEDIA_FORBIDDEN,
-          message: "You do not own this media asset",
+          statusCode: 404,
+          code: ERROR_CODES.MEDIA_NOT_FOUND,
+          message: "Some media assets were not found",
         });
       }
-    }
-  }
-
-  const product = await prisma.product.findFirst({
-    where: {
-      id: productId,
-      shopId: shop.id,
-      status: { not: "DELETED" },
-    },
-  });
+      for (const asset of assets) {
+        if (asset.ownerId && asset.ownerId !== userId) {
+          throw new AppError({
+            statusCode: 403,
+            code: ERROR_CODES.MEDIA_FORBIDDEN,
+            message: "You do not own this media asset",
+          });
+        }
+      }
+    })(),
+    prisma.product.findFirst({
+      where: {
+        id: productId,
+        shopId: shop.id,
+        status: { not: "DELETED" },
+      },
+      select: { id: true, sku: true, status: true },
+    }),
+  ]);
+  void mediaCheck;
 
   if (!product) {
     throw new AppError({
@@ -1067,6 +1116,7 @@ async function updateShopProduct(userId, productId, input) {
         sku: finalSku,
         status: { not: "DELETED" },
       },
+      select: { id: true },
     });
     if (existing) {
       throw new AppError({
@@ -1150,7 +1200,7 @@ async function updateShopProduct(userId, productId, input) {
  */
 async function deleteShopProduct(userId, productId) {
   const prisma = getPrisma();
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId);
 
   const product = await prisma.product.findFirst({
     where: {
@@ -1158,6 +1208,7 @@ async function deleteShopProduct(userId, productId) {
       shopId: shop.id,
       status: { not: "DELETED" },
     },
+    select: { id: true },
   });
 
   if (!product) {
@@ -1186,7 +1237,7 @@ async function deleteShopProduct(userId, productId) {
  */
 async function toggleShopProductStock(userId, productId, input) {
   const prisma = getPrisma();
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId);
 
   const product = await prisma.product.findFirst({
     where: {
@@ -1194,6 +1245,7 @@ async function toggleShopProductStock(userId, productId, input) {
       shopId: shop.id,
       status: { not: "DELETED" },
     },
+    select: { id: true, status: true },
   });
 
   if (!product) {
@@ -1233,15 +1285,25 @@ async function toggleShopProductStock(userId, productId, input) {
  */
 async function attachProductImage(userId, productId, input) {
   const prisma = getPrisma();
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId);
+  const { mediaId, alt, sortOrder } = input;
 
-  const product = await prisma.product.findFirst({
-    where: {
-      id: productId,
-      shopId: shop.id,
-      status: { not: "DELETED" },
-    },
-  });
+  // Product ownership check and media-asset lookup are independent —
+  // run them in parallel.
+  const [product, mediaAsset] = await Promise.all([
+    prisma.product.findFirst({
+      where: {
+        id: productId,
+        shopId: shop.id,
+        status: { not: "DELETED" },
+      },
+      select: { id: true },
+    }),
+    prisma.mediaAsset.findUnique({
+      where: { id: mediaId },
+      select: { id: true, ownerId: true },
+    }),
+  ]);
 
   if (!product) {
     throw new AppError({
@@ -1251,12 +1313,6 @@ async function attachProductImage(userId, productId, input) {
     });
   }
 
-  const { mediaId, alt, sortOrder } = input;
-
-  // Verify media asset exists
-  const mediaAsset = await prisma.mediaAsset.findUnique({
-    where: { id: mediaId },
-  });
   if (!mediaAsset) {
     throw new AppError({
       statusCode: 404,
@@ -1293,7 +1349,7 @@ async function attachProductImage(userId, productId, input) {
  */
 async function detachProductImage(userId, productId, imageId) {
   const prisma = getPrisma();
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId);
 
   const product = await prisma.product.findFirst({
     where: {
@@ -1301,6 +1357,7 @@ async function detachProductImage(userId, productId, imageId) {
       shopId: shop.id,
       status: { not: "DELETED" },
     },
+    select: { id: true },
   });
 
   if (!product) {
@@ -1316,6 +1373,7 @@ async function detachProductImage(userId, productId, imageId) {
       id: imageId,
       productId,
     },
+    select: { id: true },
   });
 
   if (!pImg) {
@@ -1338,19 +1396,21 @@ async function detachProductImage(userId, productId, imageId) {
  */
 async function bulkUpdateShopProducts(userId, input) {
   const prisma = getPrisma();
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId);
   const { productIds, action, status, stockAvailable, stockStatus } = input;
 
-  // Verify all products belong to the shop
-  const products = await prisma.product.findMany({
+  // Verify all products belong to the shop — only need the count of
+  // matching ids, not the full product rows.
+  const matchingIds = await prisma.product.findMany({
     where: {
       id: { in: productIds },
       shopId: shop.id,
       status: { not: "DELETED" },
     },
+    select: { id: true },
   });
 
-  if (products.length !== productIds.length) {
+  if (matchingIds.length !== productIds.length) {
     throw new AppError({
       statusCode: 400,
       code: ERROR_CODES.VALIDATION_ERROR,
@@ -1387,17 +1447,19 @@ async function bulkUpdateShopProducts(userId, input) {
       if (stockStatus !== undefined) updateData.stockStatus = stockStatus;
 
       if (stockAvailable === true) {
-        await tx.product.updateMany({
-          where: { id: { in: productIds }, status: "INACTIVE" },
-          data: {
-            ...updateData,
-            status: "ACTIVE",
-          },
-        });
-        await tx.product.updateMany({
-          where: { id: { in: productIds }, status: { not: "INACTIVE" } },
-          data: updateData,
-        });
+        await Promise.all([
+          tx.product.updateMany({
+            where: { id: { in: productIds }, status: "INACTIVE" },
+            data: {
+              ...updateData,
+              status: "ACTIVE",
+            },
+          }),
+          tx.product.updateMany({
+            where: { id: { in: productIds }, status: { not: "INACTIVE" } },
+            data: updateData,
+          }),
+        ]);
       } else {
         await tx.product.updateMany({
           where: { id: { in: productIds } },
@@ -1415,13 +1477,16 @@ async function bulkUpdateShopProducts(userId, input) {
  */
 async function createPromotionRequest(userId, input) {
   const prisma = getPrisma();
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId, {
+    address: { select: { city: true } },
+  });
 
   const { description, mediaId } = input;
 
-  // Verify that the media asset exists and belongs to the user (optional check)
+  // Verify that the media asset exists and belongs to the user
   const mediaAsset = await prisma.mediaAsset.findUnique({
     where: { id: mediaId },
+    select: { id: true, ownerId: true },
   });
 
   if (!mediaAsset) {
@@ -1467,7 +1532,7 @@ async function createPromotionRequest(userId, input) {
  * List all promotion requests (banners) for this shopkeeper
  */
 async function listPromotionRequests(userId) {
-  const shop = await getShopkeeperShop(userId);
+  const shop = await getShopkeeperShopRef(userId);
   const prisma = getPrisma();
 
   const banners = await prisma.banner.findMany({

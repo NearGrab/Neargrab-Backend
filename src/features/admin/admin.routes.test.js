@@ -62,6 +62,7 @@ const mockPrisma = {
   shopLead: {
     count: jest.fn(),
     findMany: jest.fn(),
+    groupBy: jest.fn(),
   },
   contentPage: {
     findMany: jest.fn(),
@@ -69,6 +70,7 @@ const mockPrisma = {
     update: jest.fn(),
   },
   $transaction: jest.fn((callback) => callback(mockPrisma)),
+  $queryRaw: jest.fn(),
 };
 
 jest.mock("../../config/prisma", () => ({
@@ -157,6 +159,14 @@ describe("Admin Feature Routes", () => {
       mockPrisma.product.count.mockResolvedValue(100);
       mockPrisma.review.count.mockResolvedValue(2);
       mockPrisma.feedback.count.mockResolvedValue(1);
+      mockPrisma.shopLead.count.mockResolvedValue(50);
+      mockPrisma.shopLead.groupBy.mockResolvedValue([
+        { source: "SEARCH", _count: { _all: 30 } },
+        { source: "MAP_VIEW", _count: { _all: 20 } },
+      ]);
+      mockPrisma.$queryRaw.mockResolvedValue([
+        { city: "Surat", count: 50 },
+      ]);
       mockPrisma.shopLead.findMany.mockResolvedValue([]);
       mockPrisma.auditLog.findMany.mockResolvedValue([]);
 
