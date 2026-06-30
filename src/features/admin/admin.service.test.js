@@ -289,4 +289,22 @@ describe("AdminService", () => {
       expect(mockPrisma.auditLog.create).toHaveBeenCalled();
     });
   });
+
+  describe("getRouteVisitsSummary", () => {
+    it("should fetch route-level visits summary from queryRaw", async () => {
+      const mockResult = [
+        { path: "/explore", totalVisits: 100, uniqueVisitors: 50 },
+        { path: "/search", totalVisits: 50, uniqueVisitors: 20 },
+      ];
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce(mockResult)
+        .mockResolvedValueOnce([{ count: 70 }]);
+
+      const result = await adminService.getRouteVisitsSummary();
+
+      expect(result.visits).toEqual(mockResult);
+      expect(result.totalUniqueVisitors).toBe(70);
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(2);
+    });
+  });
 });

@@ -17,6 +17,7 @@ const onboardingRoutes = require("../features/shopkeeper-onboarding/onboarding.r
 const shopkeeperDashboardRoutes = require("../features/shopkeeper-dashboard/dashboard.routes");
 const adminRoutes = require("../features/admin/admin.routes");
 const mediaRoutes = require("../features/media/media.routes");
+const analyticsRoutes = require("../features/analytics/analytics.routes");
 
 
 const router = express.Router();
@@ -46,6 +47,7 @@ router.use("/api/v1/shopkeeper/onboarding", onboardingRoutes);
 router.use("/api/v1/shopkeeper", shopkeeperDashboardRoutes);
 router.use("/api/v1/admin", adminRoutes);
 router.use("/api/v1/media", mediaRoutes);
+router.use("/api/v1/analytics", analyticsRoutes);
 
 
 module.exports = router;

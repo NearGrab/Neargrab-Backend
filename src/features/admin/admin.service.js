@@ -160,6 +160,9 @@ async function getDashboardSummary() {
     productsPrev7,
     leadsBySourceGroups,
     topCitiesRaw,
+    totalVisitorsRaw,
+    visitorsLast7Raw,
+    visitorsPrev7Raw,
     logs,
   ] = await Promise.all([
     prisma.user.count({ where: { status: "ACTIVE", role: NON_ADMIN_ROLES } }),
@@ -219,6 +222,10 @@ async function getDashboardSummary() {
       ORDER BY count DESC
     `,
 
+    prisma.$queryRaw`SELECT COUNT(DISTINCT "visitorId")::int AS count FROM "VisitorLog"`,
+    prisma.$queryRaw`SELECT COUNT(DISTINCT "visitorId")::int AS count FROM "VisitorLog" WHERE "createdAt" >= ${sevenDaysAgo}`,
+    prisma.$queryRaw`SELECT COUNT(DISTINCT "visitorId")::int AS count FROM "VisitorLog" WHERE "createdAt" >= ${fourteenDaysAgo} AND "createdAt" < ${sevenDaysAgo}`,
+
     prisma.auditLog.findMany({
       take: 5,
       orderBy: { createdAt: "desc" },
@@ -234,6 +241,11 @@ async function getDashboardSummary() {
   const newUsersTrend = calculateTrend(newUsersLast7, newUsersPrev7);
   const newShopsTrend = calculateTrend(newShopsLast7, newShopsPrev7);
   const productsAddedTrend = calculateTrend(productsLast7, productsPrev7);
+
+  const totalVisitors = totalVisitorsRaw[0]?.count || 0;
+  const visitorsLast7 = visitorsLast7Raw[0]?.count || 0;
+  const visitorsPrev7 = visitorsPrev7Raw[0]?.count || 0;
+  const totalVisitorsTrend = calculateTrend(visitorsLast7, visitorsPrev7);
 
   // Top cities, from the raw aggregate (already grouped + sorted by the DB).
   const maxLeads = topCitiesRaw[0]?.count || 1;
@@ -313,6 +325,8 @@ async function getDashboardSummary() {
       totalReviewsTrend,
       totalLeads: totalLeadsCount,
       totalLeadsTrend,
+      totalVisitors,
+      totalVisitorsTrend,
       newUsers: newUsersLast7,
       newUsersTrend,
       newShops: newShopsLast7,
@@ -1561,10 +1575,34 @@ async function listAuditLogs(filters) {
   return { logs, meta };
 }
 
+async function getRouteVisitsSummary() {
+  const prisma = getPrisma();
+  const [visits, uniqueCountRaw] = await Promise.all([
+    prisma.$queryRaw`
+      SELECT 
+        path, 
+        COUNT(*)::int AS "totalVisits", 
+        COUNT(DISTINCT "visitorId")::int AS "uniqueVisitors"
+      FROM "VisitorLog"
+      GROUP BY path
+      ORDER BY "totalVisits" DESC
+    `,
+    prisma.$queryRaw`
+      SELECT COUNT(DISTINCT "visitorId")::int AS count FROM "VisitorLog"
+    `
+  ]);
+
+  return {
+    visits,
+    totalUniqueVisitors: uniqueCountRaw[0]?.count || 0
+  };
+}
+
 module.exports = {
   adminLogin,
   getAdminProfile,
   getDashboardSummary,
+  getRouteVisitsSummary,
   listUsers,
   getUserDetail,
   updateUser,

@@ -487,10 +487,20 @@ async function listAuditLogs(req, res, next) {
   }
 }
 
+async function getRouteVisitsSummary(req, res, next) {
+  try {
+    const data = await adminService.getRouteVisitsSummary();
+    sendSuccess(res, data);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   adminLogin,
   getAdminProfile,
   getDashboardSummary,
+  getRouteVisitsSummary,
   listUsers,
   getUserDetail,
   updateUser,

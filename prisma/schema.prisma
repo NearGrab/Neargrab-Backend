@@ -935,3 +935,15 @@ model ProductAnalytics {
 
   product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
+
+model VisitorLog {
+  id         String   @id @default(cuid())
+  visitorId  String
+  path       String
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([visitorId, createdAt])
+}

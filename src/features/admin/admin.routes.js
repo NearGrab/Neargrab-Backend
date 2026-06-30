@@ -22,6 +22,7 @@ router.get("/me", controller.getAdminProfile);
 
 // 2. Dashboard
 router.get("/dashboard", controller.getDashboardSummary);
+router.get("/analytics/visits", controller.getRouteVisitsSummary);
 
 // 3. User management
 router.get(

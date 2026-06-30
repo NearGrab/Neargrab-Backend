@@ -211,6 +211,24 @@ describe("Admin Feature Routes", () => {
     });
   });
 
+  describe("GET /api/v1/admin/analytics/visits", () => {
+    it("should return route visits summary for authorized admin", async () => {
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([{ path: "/explore", totalVisits: 100, uniqueVisitors: 50 }])
+        .mockResolvedValueOnce([{ count: 50 }]);
+
+      const res = await request(app)
+        .get("/api/v1/admin/analytics/visits")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.visits).toHaveLength(1);
+      expect(res.body.data.visits[0].path).toBe("/explore");
+      expect(res.body.data.totalUniqueVisitors).toBe(50);
+    });
+  });
+
   describe("PATCH /api/v1/admin/users/:userId", () => {
     it("should successfully update a user's status", async () => {
       const targetUser = {
