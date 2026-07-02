@@ -6,8 +6,13 @@ const env = require("../config/env");
 describe("Security Middleware", () => {
   describe("CORS Middleware", () => {
     let app;
+    let originalCorsOrigins;
 
     beforeAll(() => {
+      originalCorsOrigins = [...env.CORS_ORIGINS];
+      env.CORS_ORIGINS.length = 0;
+      env.CORS_ORIGINS.push("http://localhost:5173");
+
       app = express();
       app.use(corsMiddleware);
       app.get("/test-cors", (req, res) => {
@@ -23,6 +28,11 @@ describe("Security Middleware", () => {
           },
         });
       });
+    });
+
+    afterAll(() => {
+      env.CORS_ORIGINS.length = 0;
+      env.CORS_ORIGINS.push(...originalCorsOrigins);
     });
 
     it("should allow request with no origin (e.g. server-to-server or mobile client)", async () => {

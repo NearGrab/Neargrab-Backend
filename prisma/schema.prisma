@@ -3,7 +3,755 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
+}
+
+model User {
+  id                      String                   @id @default(cuid())
+  name                    String
+  username                String?                  @unique
+  email                   String?                  @unique
+  phone                   String?                  @unique
+  passwordHash            String?
+  role                    UserRole                 @default(CUSTOMER)
+  status                  UserStatus               @default(ACTIVE)
+  avatarId                String?
+  city                    String?
+  state                   String?
+  pincode                 String?
+  emailVerifiedAt         DateTime?
+  phoneVerifiedAt         DateTime?
+  lastLoginAt             DateTime?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  deletedAt               DateTime?
+  preferredCity           String?
+  auditLogs               AuditLog[]               @relation("AuditActor")
+  authAccounts            AuthAccount[]
+  bannerImpressions       BannerImpression[]
+  cart                    Cart?
+  feedback                Feedback[]
+  ownedMedia              MediaAsset[]             @relation("MediaOwner")
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+  productRequests         ProductRequest[]
+  productViews            ProductView[]
+  reservations            Reservation[]
+  reviews                 Review[]
+  reviewVotes             ReviewVote[]
+  savedProducts           SavedProduct[]
+  searchEvents            SearchEvent[]
+  sessions                Session[]
+  shop                    Shop?
+  shopLeads               ShopLead[]
+  avatar                  MediaAsset?              @relation("UserAvatar", fields: [avatarId], references: [id])
+  following               UserFollow[]             @relation("UserFollowing")
+  followers               UserFollow[]             @relation("UserFollowers")
+  profile                 UserProfile?
+}
+
+model UserFollow {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model AuthAccount {
+  id               String       @id @default(cuid())
+  userId           String
+  provider         AuthProvider
+  providerUserId   String
+  accessTokenHash  String?
+  refreshTokenHash String?
+  expiresAt        DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model OtpCode {
+  id         String     @id @default(cuid())
+  identifier String
+  purpose    OtpPurpose
+  codeHash   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  attempts   Int        @default(0)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([identifier, purpose, expiresAt])
+}
+
+model UserProfile {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  bio             String?
+  language        String?
+  dateOfBirth     DateTime?
+  privacyJson     Json?
+  preferencesJson Json?
+  impactScore     Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Shop {
+  id                 String              @id @default(cuid())
+  ownerId            String              @unique
+  name               String
+  username           String              @unique
+  slug               String              @unique
+  categoryId         String?
+  type               String?
+  establishedYear    Int?
+  description        String?
+  gstNumber          String?
+  panNumber          String?
+  status             ShopStatus          @default(DRAFT)
+  verificationStatus VerificationStatus  @default(UNVERIFIED)
+  logoId             String?
+  coverId            String?
+  ratingAvg          Decimal             @default(0) @db.Decimal(3, 2)
+  ratingCount        Int                 @default(0)
+  viewCount          Int                 @default(0)
+  leadCount          Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  deletedAt          DateTime?
+  city               String              @default("Surat")
+  googleMapsUrl      String?
+  banners            Banner[]
+  products           Product[]
+  productViews       ProductView[]
+  reservations       Reservation[]
+  reviews            Review[]
+  category           Category?           @relation(fields: [categoryId], references: [id])
+  cover              MediaAsset?         @relation("ShopCover", fields: [coverId], references: [id])
+  logo               MediaAsset?         @relation("ShopLogo", fields: [logoId], references: [id])
+  owner              User                @relation(fields: [ownerId], references: [id])
+  address            ShopAddress?
+  contact            ShopContact?
+  languages          ShopLanguage[]
+  leads              ShopLead[]
+  paymentMethods     ShopPaymentMethod[]
+  photos             ShopPhoto[]
+  tags               ShopTag[]
+  timings            ShopTiming[]
+  updates            ShopUpdate[]
+
+  @@index([status, verificationStatus])
+  @@index([categoryId])
+}
+
+model ShopAddress {
+  id              String   @id @default(cuid())
+  shopId          String   @unique
+  street          String
+  landmark        String?
+  city            String
+  state           String
+  pincode         String
+  latitude        Decimal  @db.Decimal(10, 7)
+  longitude       Decimal  @db.Decimal(10, 7)
+  serviceRadiusKm Decimal  @default(1) @db.Decimal(5, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  shop            Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([city, pincode])
+  @@index([latitude, longitude])
+}
+
+model ShopContact {
+  id                   String   @id @default(cuid())
+  shopId               String   @unique
+  phone                String
+  whatsapp             String?
+  alternatePhone       String?
+  email                String?
+  acceptCalls          Boolean  @default(true)
+  enableStockRequests  Boolean  @default(true)
+  receiveNotifications Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  shop                 Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+}
+
+model ShopTiming {
+  id        String   @id @default(cuid())
+  shopId    String
+  weekday   Int
+  opensAt   String
+  closesAt  String
+  isClosed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, weekday])
+}
+
+model ShopPhoto {
+  id        String     @id @default(cuid())
+  shopId    String
+  mediaId   String
+  kind      String
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  media     MediaAsset @relation(fields: [mediaId], references: [id])
+  shop      Shop       @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, sortOrder])
+}
+
+model ShopPaymentMethod {
+  id        String        @id @default(cuid())
+  shopId    String
+  method    PaymentMethod
+  upiId     String?
+  enabled   Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  shop      Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, method])
+}
+
+model ShopLanguage {
+  id        String   @id @default(cuid())
+  shopId    String
+  language  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, language])
+}
+
+model ShopTag {
+  id        String   @id @default(cuid())
+  shopId    String
+  tag       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, tag])
+}
+
+model ShopUpdate {
+  id          String      @id @default(cuid())
+  shopId      String
+  title       String
+  body        String
+  mediaId     String?
+  publishedAt DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  media       MediaAsset? @relation(fields: [mediaId], references: [id])
+  shop        Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, publishedAt])
+}
+
+model Category {
+  id              String           @id @default(cuid())
+  name            String
+  slug            String           @unique
+  parentId        String?
+  icon            String?
+  status          String           @default("active")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+  parent          Category?        @relation("CategoryTree", fields: [parentId], references: [id])
+  children        Category[]       @relation("CategoryTree")
+  products        Product[]
+  productRequests ProductRequest[]
+  shops           Shop[]
+
+  @@index([name])
+  @@index([status])
+}
+
+model Brand {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  status    String    @default("active")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  products  Product[]
+
+  @@index([name])
+  @@index([status])
+}
+
+model Product {
+  id               String             @id @default(cuid())
+  shopId           String
+  categoryId       String?
+  brandId          String?
+  name             String
+  slug             String
+  sku              String?
+  description      String?
+  size             String?
+  unit             String?
+  tags             String[]
+  pricePaise       Int
+  mrpPaise         Int?
+  currency         String             @default("INR")
+  status           ProductStatus      @default(DRAFT)
+  stockStatus      StockStatus        @default(IN_STOCK)
+  stockAvailable   Boolean            @default(true)
+  stockCount       Int?
+  isPinned         Boolean            @default(false)
+  isFlagged        Boolean            @default(false)
+  ratingAvg        Decimal            @default(0) @db.Decimal(3, 2)
+  reviewCount      Int                @default(0)
+  viewCount        Int                @default(0)
+  searchBoost      Int                @default(0)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  deletedAt        DateTime?
+  banners          Banner[]
+  cartItems        CartItem[]
+  brand            Brand?             @relation(fields: [brandId], references: [id])
+  category         Category?          @relation(fields: [categoryId], references: [id])
+  shop             Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  analytics        ProductAnalytics?
+  attributes       ProductAttribute[]
+  images           ProductImage[]
+  productRequests  ProductRequest[]
+  productViews     ProductView[]
+  reservationItems ReservationItem[]
+  reviews          Review[]
+  savedBy          SavedProduct[]
+  shopLeads        ShopLead[]
+
+  @@unique([shopId, sku])
+  @@index([name])
+  @@index([sku])
+  @@index([status, stockStatus])
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([isPinned])
+}
+
+model ProductImage {
+  id        String     @id @default(cuid())
+  productId String
+  mediaId   String
+  alt       String?
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  media     MediaAsset @relation(fields: [mediaId], references: [id])
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+}
+
+model ProductAttribute {
+  id        String   @id @default(cuid())
+  productId String
+  key       String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, key])
+}
+
+model SavedProduct {
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, productId])
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  status    String     @default("active")
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+}
+
+model CartItem {
+  id                 String   @id @default(cuid())
+  cartId             String
+  productId          String
+  quantity           Int      @default(1)
+  nameSnapshot       String
+  pricePaiseSnapshot Int
+  shopNameSnapshot   String
+  imageUrlSnapshot   String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  cart               Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product            Product  @relation(fields: [productId], references: [id])
+
+  @@unique([cartId, productId])
+}
+
+model Reservation {
+  id             String            @id @default(cuid())
+  userId         String
+  shopId         String
+  status         ReservationStatus @default(REQUESTED)
+  totalPaise     Int
+  currency       String            @default("INR")
+  customerNote   String?
+  shopkeeperNote String?
+  expiresAt      DateTime?
+  acceptedAt     DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deletedAt      DateTime?
+  shop           Shop              @relation(fields: [shopId], references: [id])
+  user           User              @relation(fields: [userId], references: [id])
+  items          ReservationItem[]
+  reviews        Review[]
+
+  @@index([userId, status])
+  @@index([shopId, status])
+}
+
+model ReservationItem {
+  id                 String      @id @default(cuid())
+  reservationId      String
+  productId          String
+  quantity           Int
+  pricePaiseSnapshot Int
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  product            Product     @relation(fields: [productId], references: [id])
+  reservation        Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+}
+
+model ProductRequest {
+  id         String    @id @default(cuid())
+  userId     String?
+  query      String
+  categoryId String?
+  productId  String?
+  city       String?
+  latitude   Decimal?  @db.Decimal(10, 7)
+  longitude  Decimal?  @db.Decimal(10, 7)
+  radiusKm   Decimal?  @db.Decimal(5, 2)
+  status     String    @default("open")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  category   Category? @relation(fields: [categoryId], references: [id])
+  product    Product?  @relation(fields: [productId], references: [id])
+  user       User?     @relation(fields: [userId], references: [id])
+
+  @@index([query])
+  @@index([city, status])
+}
+
+model Review {
+  id               String        @id @default(cuid())
+  userId           String
+  shopId           String?
+  productId        String?
+  reservationId    String?
+  rating           Int
+  comment          String
+  status           ReviewStatus  @default(PUBLISHED)
+  verifiedPurchase Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  deletedAt        DateTime?
+  product          Product?      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  reservation      Reservation?  @relation(fields: [reservationId], references: [id])
+  shop             Shop?         @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media            ReviewMedia[]
+  votes            ReviewVote[]
+
+  @@index([productId, status])
+  @@index([shopId, status])
+}
+
+model ReviewMedia {
+  id        String     @id @default(cuid())
+  reviewId  String
+  mediaId   String
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  media     MediaAsset @relation(fields: [mediaId], references: [id])
+  review    Review     @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+}
+
+model ReviewVote {
+  userId    String
+  reviewId  String
+  value     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, reviewId])
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  userId    String?
+  type      String
+  subject   String?
+  message   String
+  metadata  Json?
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([type, status])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?
+  readAt    DateTime?
+  actionUrl String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+model NotificationPreference {
+  id        String              @id @default(cuid())
+  userId    String
+  channel   NotificationChannel
+  type      NotificationType
+  enabled   Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channel, type])
+}
+
+model Banner {
+  id           String             @id @default(cuid())
+  title        String
+  shopId       String?
+  productId    String?
+  city         String?
+  section      BannerSection
+  status       BannerStatus
+  devices      DeviceTarget[]
+  plan         String?
+  imageId      String?
+  startAt      DateTime
+  endAt        DateTime
+  sortOrder    Int                @default(0)
+  views        Int                @default(0)
+  clicks       Int                @default(0)
+  revenuePaise Int                @default(0)
+  currency     String             @default("INR")
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  deletedAt    DateTime?
+  image        MediaAsset?        @relation("BannerImage", fields: [imageId], references: [id])
+  product      Product?           @relation(fields: [productId], references: [id])
+  shop         Shop?              @relation(fields: [shopId], references: [id])
+  impressions  BannerImpression[]
+
+  @@index([city, section, status, startAt, endAt])
+}
+
+model PinRule {
+  id         String   @id @default(cuid())
+  city       String
+  targetType String
+  pinLimit   Int      @default(10)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([city, targetType])
+}
+
+model ContentPage {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  title       String
+  body        Json
+  status      String    @default("draft")
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model AdminPermission {
+  id         String   @id @default(cuid())
+  role       UserRole
+  permission String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([role, permission])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model SearchEvent {
+  id          String   @id @default(cuid())
+  userId      String?
+  query       String
+  city        String?
+  latitude    Decimal? @db.Decimal(10, 7)
+  longitude   Decimal? @db.Decimal(10, 7)
+  radiusKm    Decimal? @db.Decimal(5, 2)
+  filters     Json?
+  resultCount Int
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([query])
+  @@index([city, createdAt])
+}
+
+model ProductView {
+  id        String      @id @default(cuid())
+  userId    String?
+  productId String
+  shopId    String?
+  source    LeadSource?
+  createdAt DateTime    @default(now())
+  product   Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  shop      Shop?       @relation(fields: [shopId], references: [id])
+  user      User?       @relation(fields: [userId], references: [id])
+
+  @@index([productId, createdAt])
+  @@index([shopId, createdAt])
+}
+
+model ShopLead {
+  id        String     @id @default(cuid())
+  userId    String?
+  shopId    String
+  productId String?
+  source    LeadSource
+  metadata  Json?
+  createdAt DateTime   @default(now())
+  product   Product?   @relation(fields: [productId], references: [id])
+  shop      Shop       @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user      User?      @relation(fields: [userId], references: [id])
+
+  @@index([shopId, source, createdAt])
+}
+
+model BannerImpression {
+  id        String        @id @default(cuid())
+  bannerId  String
+  userId    String?
+  device    DeviceTarget?
+  city      String?
+  clickedAt DateTime?
+  createdAt DateTime      @default(now())
+  banner    Banner        @relation(fields: [bannerId], references: [id], onDelete: Cascade)
+  user      User?         @relation(fields: [userId], references: [id])
+
+  @@index([bannerId, createdAt])
+  @@index([city, createdAt])
+}
+
+model MediaAsset {
+  id            String         @id @default(cuid())
+  ownerId       String?
+  url           String
+  key           String         @unique
+  bucket        String
+  mimeType      String
+  sizeBytes     Int
+  width         Int?
+  height        Int?
+  altText       String?
+  createdAt     DateTime       @default(now())
+  bannerImages  Banner[]       @relation("BannerImage")
+  owner         User?          @relation("MediaOwner", fields: [ownerId], references: [id])
+  productImages ProductImage[]
+  reviewMedia   ReviewMedia[]
+  shopCovers    Shop[]         @relation("ShopCover")
+  shopLogos     Shop[]         @relation("ShopLogo")
+  shopPhotos    ShopPhoto[]
+  shopUpdates   ShopUpdate[]
+  userAvatars   User[]         @relation("UserAvatar")
+
+  @@index([ownerId])
+}
+
+model ProductAnalytics {
+  id          String   @id @default(cuid())
+  productId   String   @unique
+  totalClicks Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 enum UserRole {
@@ -140,810 +888,4 @@ enum PaymentMethod {
   UPI
   CARD
   WALLET
-}
-
-model User {
-  id              String        @id @default(cuid())
-  name            String
-  username        String?       @unique
-  email           String?       @unique
-  phone           String?       @unique
-  passwordHash    String?
-  role            UserRole      @default(CUSTOMER)
-  status          UserStatus    @default(ACTIVE)
-  avatarId        String?
-  city            String?
-  state           String?
-  pincode         String?
-  preferredCity   String?
-  emailVerifiedAt DateTime?
-  phoneVerifiedAt DateTime?
-  lastLoginAt     DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  deletedAt       DateTime?
-
-  avatar                  MediaAsset?              @relation("UserAvatar", fields: [avatarId], references: [id])
-  ownedMedia              MediaAsset[]             @relation("MediaOwner")
-  profile                 UserProfile?
-  authAccounts            AuthAccount[]
-  sessions                Session[]
-  shop                    Shop?
-  reviews                 Review[]
-  reviewVotes             ReviewVote[]
-  savedProducts           SavedProduct[]
-  cart                    Cart?
-  reservations            Reservation[]
-  productRequests         ProductRequest[]
-  notifications           Notification[]
-  notificationPreferences NotificationPreference[]
-  auditLogs               AuditLog[]               @relation("AuditActor")
-  searchEvents            SearchEvent[]
-  productViews            ProductView[]
-  shopLeads               ShopLead[]
-  bannerImpressions       BannerImpression[]
-  feedback                Feedback[]
-  followers               UserFollow[]             @relation("UserFollowers")
-  following               UserFollow[]             @relation("UserFollowing")
-}
-
-model UserFollow {
-  followerId  String
-  followingId String
-  createdAt   DateTime @default(now())
-
-  follower  User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
-  following User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
-
-  @@id([followerId, followingId])
-  @@index([followerId])
-  @@index([followingId])
-}
-
-model AuthAccount {
-  id               String       @id @default(cuid())
-  userId           String
-  provider         AuthProvider
-  providerUserId   String
-  accessTokenHash  String?
-  refreshTokenHash String?
-  expiresAt        DateTime?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerUserId])
-  @@index([userId])
-}
-
-model Session {
-  id               String    @id @default(cuid())
-  userId           String
-  refreshTokenHash String
-  userAgent        String?
-  ipAddress        String?
-  expiresAt        DateTime
-  revokedAt        DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, expiresAt])
-}
-
-model OtpCode {
-  id         String     @id @default(cuid())
-  identifier String
-  purpose    OtpPurpose
-  codeHash   String
-  expiresAt  DateTime
-  consumedAt DateTime?
-  attempts   Int        @default(0)
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-
-  @@index([identifier, purpose, expiresAt])
-}
-
-model UserProfile {
-  id              String    @id @default(cuid())
-  userId          String    @unique
-  bio             String?
-  language        String?
-  dateOfBirth     DateTime?
-  privacyJson     Json?
-  preferencesJson Json?
-  impactScore     Int       @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Shop {
-  id                 String             @id @default(cuid())
-  ownerId            String             @unique
-  name               String
-  username           String             @unique
-  slug               String             @unique
-  categoryId         String?
-  type               String?
-  establishedYear    Int?
-  description        String?
-//   gstNumber          String?
-//   panNumber          String?
-  status             ShopStatus         @default(DRAFT)
-  verificationStatus VerificationStatus @default(UNVERIFIED)
-  logoId             String?
-  coverId            String?
-  ratingAvg          Decimal            @default(0) @db.Decimal(3, 2)
-  ratingCount        Int                @default(0)
-  viewCount          Int                @default(0)
-  leadCount          Int                @default(0)
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  deletedAt          DateTime?
-  googleMapsUrl      String?
-  city               String             @default("Surat")
-
-  owner          User                @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  category       Category?           @relation(fields: [categoryId], references: [id])
-  logo           MediaAsset?         @relation("ShopLogo", fields: [logoId], references: [id])
-  cover          MediaAsset?         @relation("ShopCover", fields: [coverId], references: [id])
-  address        ShopAddress?
-  contact        ShopContact?
-  timings        ShopTiming[]
-  photos         ShopPhoto[]
-  paymentMethods ShopPaymentMethod[]
-  languages      ShopLanguage[]
-  tags           ShopTag[]
-  updates        ShopUpdate[]
-  products       Product[]
-  reviews        Review[]
-  reservations   Reservation[]
-  banners        Banner[]
-  productViews   ProductView[]
-  leads          ShopLead[]
-
-  @@index([status, verificationStatus])
-  @@index([categoryId])
-  @@index([status, deletedAt, city])
-}
-
-model ShopAddress {
-  id              String   @id @default(cuid())
-  shopId          String   @unique
-  street          String
-  landmark        String?
-  city            String
-  state           String
-  pincode         String
-  latitude        Decimal  @db.Decimal(10, 7)
-  longitude       Decimal  @db.Decimal(10, 7)
-  serviceRadiusKm Decimal  @default(1) @db.Decimal(5, 2)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-
-  @@index([city, pincode])
-  @@index([latitude, longitude])
-}
-
-model ShopContact {
-  id                   String   @id @default(cuid())
-  shopId               String   @unique
-  phone                String
-  whatsapp             String?
-  alternatePhone       String?
-  email                String?
-  acceptCalls          Boolean  @default(true)
-  enableStockRequests  Boolean  @default(true)
-  receiveNotifications Boolean  @default(true)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-}
-
-model ShopTiming {
-  id        String   @id @default(cuid())
-  shopId    String
-  weekday   Int
-  opensAt   String
-  closesAt  String
-  isClosed  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-
-  @@unique([shopId, weekday])
-}
-
-model ShopPhoto {
-  id        String   @id @default(cuid())
-  shopId    String
-  mediaId   String
-  kind      String
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  shop  Shop       @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  media MediaAsset @relation(fields: [mediaId], references: [id])
-
-  @@index([shopId, sortOrder])
-}
-
-model ShopPaymentMethod {
-  id        String        @id @default(cuid())
-  shopId    String
-  method    PaymentMethod
-  upiId     String?
-  enabled   Boolean       @default(true)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-
-  @@unique([shopId, method])
-}
-
-model ShopLanguage {
-  id        String   @id @default(cuid())
-  shopId    String
-  language  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-
-  @@unique([shopId, language])
-}
-
-model ShopTag {
-  id        String   @id @default(cuid())
-  shopId    String
-  tag       String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-
-  @@unique([shopId, tag])
-}
-
-model ShopUpdate {
-  id          String    @id @default(cuid())
-  shopId      String
-  title       String
-  body        String
-  mediaId     String?
-  publishedAt DateTime?
-  expiresAt   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  shop  Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  media MediaAsset? @relation(fields: [mediaId], references: [id])
-
-  @@index([shopId, publishedAt])
-}
-
-model Category {
-  id        String    @id @default(cuid())
-  name      String
-  slug      String    @unique
-  parentId  String?
-  icon      String?
-  status    String    @default("active")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  parent          Category?        @relation("CategoryTree", fields: [parentId], references: [id])
-  children        Category[]       @relation("CategoryTree")
-  shops           Shop[]
-  products        Product[]
-  productRequests ProductRequest[]
-
-  @@index([name])
-  @@index([status])
-  @@index([parentId, status, deletedAt])
-}
-
-model Brand {
-  id        String    @id @default(cuid())
-  name      String
-  slug      String    @unique
-  status    String    @default("active")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  products Product[]
-
-  @@index([name])
-  @@index([status])
-}
-
-model Product {
-  id             String        @id @default(cuid())
-  shopId         String
-  categoryId     String?
-  brandId        String?
-  name           String
-  slug           String
-  sku            String?
-  description    String?
-  size           String?
-  unit           String?
-  tags           String[]
-  pricePaise     Int
-  mrpPaise       Int?
-  currency       String        @default("INR")
-  status         ProductStatus @default(DRAFT)
-  stockStatus    StockStatus   @default(IN_STOCK)
-  stockAvailable Boolean       @default(true)
-  stockCount     Int?
-  isPinned       Boolean       @default(false)
-  isFlagged      Boolean       @default(false)
-  ratingAvg      Decimal       @default(0) @db.Decimal(3, 2)
-  reviewCount    Int           @default(0)
-  viewCount      Int           @default(0)
-  searchBoost    Int           @default(0)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  deletedAt      DateTime?
-
-  analytics        ProductAnalytics?
-  shop             Shop              @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  category         Category?         @relation(fields: [categoryId], references: [id])
-  brand            Brand?            @relation(fields: [brandId], references: [id])
-  images           ProductImage[]
-  attributes       ProductAttribute[]
-  savedBy          SavedProduct[]
-  cartItems        CartItem[]
-  reservationItems ReservationItem[]
-  reviews          Review[]
-  productViews     ProductView[]
-  shopLeads        ShopLead[]
-  banners          Banner[]
-  productRequests  ProductRequest[]
-
-  @@unique([shopId, sku])
-  @@index([name])
-  @@index([sku])
-  @@index([status, stockStatus])
-  @@index([categoryId])
-  @@index([brandId])
-  @@index([isPinned])
-  @@index([status, deletedAt, isPinned, ratingAvg, reviewCount])
-  @@index([createdAt])
-}
-
-model ProductImage {
-  id        String   @id @default(cuid())
-  productId String
-  mediaId   String
-  alt       String?
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  product Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  media   MediaAsset @relation(fields: [mediaId], references: [id])
-
-  @@index([productId, sortOrder])
-}
-
-model ProductAttribute {
-  id        String   @id @default(cuid())
-  productId String
-  key       String
-  value     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@index([productId, key])
-}
-
-model SavedProduct {
-  userId    String
-  productId String
-  createdAt DateTime @default(now())
-
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@id([userId, productId])
-}
-
-model Cart {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  status    String   @default("active")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items CartItem[]
-}
-
-model CartItem {
-  id                 String   @id @default(cuid())
-  cartId             String
-  productId          String
-  quantity           Int      @default(1)
-  nameSnapshot       String
-  pricePaiseSnapshot Int
-  shopNameSnapshot   String
-  imageUrlSnapshot   String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
-
-  @@unique([cartId, productId])
-}
-
-model Reservation {
-  id             String            @id @default(cuid())
-  userId         String
-  shopId         String
-  status         ReservationStatus @default(REQUESTED)
-  totalPaise     Int
-  currency       String            @default("INR")
-  customerNote   String?
-  shopkeeperNote String?
-  expiresAt      DateTime?
-  acceptedAt     DateTime?
-  completedAt    DateTime?
-  cancelledAt    DateTime?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  deletedAt      DateTime?
-
-  user    User              @relation(fields: [userId], references: [id], onDelete: Restrict)
-  shop    Shop              @relation(fields: [shopId], references: [id], onDelete: Restrict)
-  items   ReservationItem[]
-  reviews Review[]
-
-  @@index([userId, status])
-  @@index([shopId, status])
-}
-
-model ReservationItem {
-  id                 String   @id @default(cuid())
-  reservationId      String
-  productId          String
-  quantity           Int
-  pricePaiseSnapshot Int
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
-  product     Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
-}
-
-model ProductRequest {
-  id         String   @id @default(cuid())
-  userId     String?
-  query      String
-  categoryId String?
-  productId  String?
-  city       String?
-  latitude   Decimal? @db.Decimal(10, 7)
-  longitude  Decimal? @db.Decimal(10, 7)
-  radiusKm   Decimal? @db.Decimal(5, 2)
-  status     String   @default("open")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  category Category? @relation(fields: [categoryId], references: [id])
-  product  Product?  @relation(fields: [productId], references: [id])
-
-  @@index([query])
-  @@index([city, status])
-}
-
-model Review {
-  id               String       @id @default(cuid())
-  userId           String
-  shopId           String?
-  productId        String?
-  reservationId    String?
-  rating           Int
-  comment          String
-  status           ReviewStatus @default(PUBLISHED)
-  verifiedPurchase Boolean      @default(false)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  deletedAt        DateTime?
-
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  shop        Shop?         @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  product     Product?      @relation(fields: [productId], references: [id], onDelete: Cascade)
-  reservation Reservation?  @relation(fields: [reservationId], references: [id], onDelete: SetNull)
-  media       ReviewMedia[]
-  votes       ReviewVote[]
-
-  @@index([productId, status])
-  @@index([shopId, status])
-  @@index([status, deletedAt, rating, createdAt])
-}
-
-model ReviewMedia {
-  id        String   @id @default(cuid())
-  reviewId  String
-  mediaId   String
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  review Review     @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  media  MediaAsset @relation(fields: [mediaId], references: [id])
-}
-
-model ReviewVote {
-  userId    String
-  reviewId  String
-  value     Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-
-  @@id([userId, reviewId])
-}
-
-model Feedback {
-  id        String   @id @default(cuid())
-  userId    String?
-  type      String
-  subject   String?
-  message   String
-  metadata  Json?
-  status    String   @default("open")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([type, status])
-}
-
-model Notification {
-  id        String           @id @default(cuid())
-  userId    String
-  type      NotificationType
-  title     String
-  message   String
-  data      Json?
-  readAt    DateTime?
-  actionUrl String?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, readAt, createdAt])
-}
-
-model NotificationPreference {
-  id        String              @id @default(cuid())
-  userId    String
-  channel   NotificationChannel
-  type      NotificationType
-  enabled   Boolean             @default(true)
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, channel, type])
-}
-
-model Banner {
-  id           String        @id @default(cuid())
-  title        String
-  shopId       String?
-  productId    String?
-  city         String?
-  section      BannerSection
-  status       BannerStatus
-  devices      DeviceTarget[]
-  plan         String?
-  imageId      String?
-  startAt      DateTime
-  endAt        DateTime
-  sortOrder    Int           @default(0)
-  views        Int           @default(0)
-  clicks       Int           @default(0)
-  revenuePaise Int           @default(0)
-  currency     String        @default("INR")
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  deletedAt    DateTime?
-
-  shop        Shop?              @relation(fields: [shopId], references: [id], onDelete: SetNull)
-  product     Product?           @relation(fields: [productId], references: [id], onDelete: SetNull)
-  image       MediaAsset?        @relation("BannerImage", fields: [imageId], references: [id])
-  impressions BannerImpression[]
-
-  @@index([city, section, status, startAt, endAt])
-  @@index([status, deletedAt, city, startAt, endAt])
-}
-
-model PinRule {
-  id         String   @id @default(cuid())
-  city       String
-  targetType String
-  pinLimit   Int      @default(10)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@unique([city, targetType])
-}
-
-model ContentPage {
-  id          String    @id @default(cuid())
-  key         String    @unique
-  title       String
-  body        Json
-  status      String    @default("draft")
-  publishedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-}
-
-model AdminPermission {
-  id         String   @id @default(cuid())
-  role       UserRole
-  permission String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@unique([role, permission])
-}
-
-model AuditLog {
-  id         String   @id @default(cuid())
-  actorId    String?
-  action     String
-  entityType String
-  entityId   String?
-  before     Json?
-  after      Json?
-  ipAddress  String?
-  userAgent  String?
-  createdAt  DateTime @default(now())
-
-  actor User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
-
-  @@index([actorId, createdAt])
-  @@index([entityType, entityId])
-  @@index([createdAt])
-}
-
-model SearchEvent {
-  id          String   @id @default(cuid())
-  userId      String?
-  query       String
-  city        String?
-  latitude    Decimal? @db.Decimal(10, 7)
-  longitude   Decimal? @db.Decimal(10, 7)
-  radiusKm    Decimal? @db.Decimal(5, 2)
-  filters     Json?
-  resultCount Int
-  createdAt   DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([query])
-  @@index([city, createdAt])
-}
-
-model ProductView {
-  id        String      @id @default(cuid())
-  userId    String?
-  productId String
-  shopId    String?
-  source    LeadSource?
-  createdAt DateTime    @default(now())
-
-  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  product Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  shop    Shop?    @relation(fields: [shopId], references: [id], onDelete: SetNull)
-
-  @@index([productId, createdAt])
-  @@index([shopId, createdAt])
-}
-
-model ShopLead {
-  id        String     @id @default(cuid())
-  userId    String?
-  shopId    String
-  productId String?
-  source    LeadSource
-  metadata  Json?
-  createdAt DateTime   @default(now())
-
-  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  shop    Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-
-  @@index([shopId, source, createdAt])
-}
-
-model BannerImpression {
-  id        String        @id @default(cuid())
-  bannerId  String
-  userId    String?
-  device    DeviceTarget?
-  city      String?
-  clickedAt DateTime?
-  createdAt DateTime      @default(now())
-
-  banner Banner @relation(fields: [bannerId], references: [id], onDelete: Cascade)
-  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([bannerId, createdAt])
-  @@index([city, createdAt])
-}
-
-model MediaAsset {
-  id        String   @id @default(cuid())
-  ownerId   String?
-  url       String
-  key       String   @unique
-  bucket    String
-  mimeType  String
-  sizeBytes Int
-  width     Int?
-  height    Int?
-  altText   String?
-  createdAt DateTime @default(now())
-
-  owner              User?          @relation("MediaOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  userAvatars        User[]         @relation("UserAvatar")
-  shopLogos          Shop[]         @relation("ShopLogo")
-  shopCovers         Shop[]         @relation("ShopCover")
-  bannerImages       Banner[]       @relation("BannerImage")
-  shopPhotos         ShopPhoto[]
-  shopUpdates        ShopUpdate[]
-  productImages      ProductImage[]
-  reviewMedia        ReviewMedia[]
-
-  @@index([ownerId])
-}
-
-model ProductAnalytics {
-  id            String   @id @default(cuid())
-  productId     String   @unique
-  totalClicks   Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-}
-
-model VisitorLog {
-  id         String   @id @default(cuid())
-  visitorId  String
-  path       String
-  ipAddress  String?
-  userAgent  String?
-  createdAt  DateTime @default(now())
-
-  @@index([createdAt])
-  @@index([visitorId, createdAt])
 }

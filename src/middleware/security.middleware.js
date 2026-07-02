@@ -8,7 +8,7 @@ const { AppError, ERROR_CODES } = require("../lib/errors");
 // CORS Configuration
 const corsMiddleware = cors({
   origin(origin, callback) {
-    if (!origin || env.CORS_ORIGINS.includes(origin)) {
+    if (!origin || env.CORS_ORIGINS.includes(origin) || env.CORS_ORIGINS.includes("*")) {
       callback(null, true);
       return;
     }
